@@ -6,11 +6,12 @@ import { Logger } from '@nestjs/common';
 
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { jobQueueName } from '../config/queue.config.js';
 
 @Injectable()
 export class ProducerService {
   private readonly logger = new Logger(ProducerService.name);
-  constructor(@InjectQueue('jobs') private readonly jobQueue: Queue) {}
+  constructor(@InjectQueue(jobQueueName) private readonly jobQueue: Queue) {}
   create(createProducerDto: CreateProducerDto) {
     this.jobQueue.add('jobs', createProducerDto);
     return createProducerDto;
