@@ -1,5 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import process from 'node:process';
+import { assertAiEnv } from './ai.config.js';
 
 try {
   process.loadEnvFile();
@@ -23,6 +24,8 @@ export function validateEnv(config: Record<string, unknown>) {
   ) {
     throw new Error('REDIS_PORT must be a number');
   }
+
+  assertAiEnv(config);
   return config;
 }
 
