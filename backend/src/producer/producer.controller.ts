@@ -31,4 +31,9 @@ export class ProducerController {
   remove(@Param('id') id: string) {
     return this.producerService.remove(+id);
   }
+
+  @Delete()
+  removeAll() {
+    return this.producerService.removeAll();
+  }
 }
