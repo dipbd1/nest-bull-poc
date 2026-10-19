@@ -7,6 +7,40 @@ CONTAINER_NAME="${CONTAINER_NAME:-redis}"
 VOLUME_NAME="${VOLUME_NAME:-redis-data}"
 PORT="${PORT:-6379}"
 
+usage() {
+  echo "Usage: $0 [install|remove]" >&2
+  exit 1
+}
+
+if [[ $# -gt 1 ]]; then
+  usage
+fi
+
+case "${1:-install}" in
+  install)
+    ;;
+  remove)
+    if ! command -v docker >/dev/null 2>&1; then
+      echo "Docker is required." >&2
+      exit 1
+    fi
+
+    if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
+      docker rm -f "$CONTAINER_NAME"
+      echo "Removed container ${CONTAINER_NAME}"
+    fi
+
+    if docker volume ls --format '{{.Name}}' | grep -qx "$VOLUME_NAME"; then
+      docker volume rm "$VOLUME_NAME"
+      echo "Removed volume ${VOLUME_NAME}"
+    fi
+    exit 0
+    ;;
+  *)
+    usage
+    ;;
+esac
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required." >&2
   exit 1
