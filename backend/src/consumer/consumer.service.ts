@@ -1,26 +1,36 @@
-import { Injectable } from '@nestjs/common';
-import { CreateConsumerDto } from './dto/create-consumer.dto.js';
-import { UpdateConsumerDto } from './dto/update-consumer.dto.js';
+import {
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { ConsumerProcessor } from './consumer.processor.js';
+
+export type ConsumerStatus = {
+  running: boolean;
+};
 
 @Injectable()
 export class ConsumerService {
-  create(createConsumerDto: CreateConsumerDto) {
-    return 'This action adds a new consumer';
+  constructor(private readonly processor: ConsumerProcessor) {}
+
+  getStatus(): ConsumerStatus {
+    return { running: !this.worker().isPaused() };
   }
 
-  findAll() {
-    return `This action returns all consumer`;
+  async setRunning(running: boolean): Promise<ConsumerStatus> {
+    const worker = this.worker();
+    if (running) {
+      await worker.resume();
+    } else {
+      await worker.pause();
+    }
+    return { running: !worker.isPaused() };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} consumer`;
-  }
-
-  update(id: number, updateConsumerDto: UpdateConsumerDto) {
-    return `This action updates a #${id} consumer`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} consumer`;
+  private worker() {
+    try {
+      return this.processor.worker;
+    } catch {
+      throw new ServiceUnavailableException('Consumer worker is not ready');
+    }
   }
 }

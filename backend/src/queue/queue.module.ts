@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { jobQueueName } from '../config/queue.config.js';
+import { QueueController } from './queue.controller.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { jobQueueName } from '../config/queue.config.js';
       name: jobQueueName,
     }),
   ],
+  controllers: [QueueController],
   exports: [BullModule],
 })
 export class QueueModule {}

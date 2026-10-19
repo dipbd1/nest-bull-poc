@@ -1,52 +1,92 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
 import { CreateProducerDto } from './dto/create-producer.dto.js';
 import { UpdateProducerDto } from './dto/update-producer.dto.js';
-
-import { Logger } from '@nestjs/common';
-
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 import { jobQueueName } from '../config/queue.config.js';
+
+export type ProducerJobData = {
+  name: string;
+  description: string;
+};
+
+export type ProducerJobView = {
+  id: string;
+  name: string;
+  data: ProducerJobData;
+  state: string;
+  attemptsMade: number;
+  timestamp: number;
+};
 
 @Injectable()
 export class ProducerService {
   private readonly logger = new Logger(ProducerService.name);
-  constructor(@InjectQueue(jobQueueName) private readonly jobQueue: Queue) {}
-  create(createProducerDto: CreateProducerDto) {
-    this.jobQueue.add('jobs', createProducerDto);
+
+  constructor(
+    @InjectQueue(jobQueueName)
+    private readonly jobQueue: Queue<ProducerJobData>,
+  ) {}
+
+  async create(createProducerDto: CreateProducerDto) {
+    await this.jobQueue.add('jobs', createProducerDto);
     return createProducerDto;
-    // return 'This action adds a new producer to the queue';
   }
 
-  findAll() {
-    const jobs = this.jobQueue.getJobs();
-    return jobs;
+  async findAll() {
+    const jobs = await this.jobQueue.getJobs();
+    return Promise.all(jobs.map((job) => this.toJobView(job)));
   }
 
-  findOne(id: number) {
+  async findOne(id: number) {
     this.logger.log(`Finding job with id: ${id}`);
-    const job = this.jobQueue.getJob(id.toString());
-    return job.then((job) => job?.data ?? null);
+    const job = await this.jobQueue.getJob(id.toString());
+    if (!job) {
+      return null;
+    }
+    return this.toJobView(job);
   }
 
-  update(id: number, updateProducerDto: UpdateProducerDto) {
+  async update(id: number, updateProducerDto: UpdateProducerDto) {
     this.logger.log(`Updating job with id: ${id}`);
-    const job = this.jobQueue.getJob(id.toString());
-    job.then((job) => job?.updateData(updateProducerDto));
-    return job.then((job) => job?.data ?? null);
+    const job = await this.jobQueue.getJob(id.toString());
+    if (!job) {
+      return null;
+    }
+    await job.updateData({
+      name: updateProducerDto.name ?? job.data.name,
+      description: updateProducerDto.description ?? job.data.description,
+    });
+    return this.toJobView(job);
   }
 
-  remove(id: number) {
+  async remove(id: number) {
     this.logger.log(`Removing job with id: ${id}`);
-    const job = this.jobQueue.getJob(id.toString());
-    job.then((job) => job?.remove());
-    return job.then((job) => job?.data ?? null);
+    const job = await this.jobQueue.getJob(id.toString());
+    if (!job) {
+      return null;
+    }
+    const view = await this.toJobView(job);
+    await job.remove();
+    return view;
   }
 
-  removeAll() {
+  async removeAll() {
     this.logger.log(`Removing all jobs`);
-    const jobs = this.jobQueue.getJobs();
-    jobs.then((jobs) => jobs.forEach((job) => job.remove()));
-    return jobs.then((jobs) => jobs.map((job) => job?.data ?? null));
+    const jobs = await this.jobQueue.getJobs();
+    const views = await Promise.all(jobs.map((job) => this.toJobView(job)));
+    await Promise.all(jobs.map((job) => job.remove()));
+    return views;
+  }
+
+  private async toJobView(job: Job<ProducerJobData>): Promise<ProducerJobView> {
+    return {
+      id: String(job.id),
+      name: job.name,
+      data: job.data,
+      state: await job.getState(),
+      attemptsMade: job.attemptsMade,
+      timestamp: job.timestamp,
+    };
   }
 }

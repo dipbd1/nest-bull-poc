@@ -1,4 +1,6 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateConsumerDto } from './create-consumer.dto.js';
+import { IsBoolean } from 'class-validator';
 
-export class UpdateConsumerDto extends PartialType(CreateConsumerDto) {}
+export class UpdateConsumerDto {
+  @IsBoolean()
+  running: boolean;
+}

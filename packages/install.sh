@@ -13,8 +13,8 @@ usage() {
 Usage:
   ./install.sh install
   ./install.sh remove
-  ./install.sh install redis|mailpit
-  ./install.sh remove redis|mailpit
+  ./install.sh install redis|postgres|mailpit
+  ./install.sh remove redis|postgres|mailpit
 EOF
   exit 1
 }
@@ -32,7 +32,7 @@ case "$action" in
 esac
 
 case "$target" in
-  ""|redis|mailpit) ;;
+  ""|redis|postgres|mailpit) ;;
   *) usage ;;
 esac
 
@@ -41,10 +41,14 @@ case "$action" in
     case "$target" in
       "")
         "$SCRIPT_DIR/redis/install.sh" install
+        "$SCRIPT_DIR/postgres/install.sh" install
         "$SCRIPT_DIR/mailpit/install.sh" install
         ;;
       redis)
         "$SCRIPT_DIR/redis/install.sh" install
+        ;;
+      postgres)
+        "$SCRIPT_DIR/postgres/install.sh" install
         ;;
       mailpit)
         "$SCRIPT_DIR/mailpit/install.sh" install
@@ -55,10 +59,14 @@ case "$action" in
     case "$target" in
       "")
         "$SCRIPT_DIR/mailpit/install.sh" remove
+        "$SCRIPT_DIR/postgres/install.sh" remove
         "$SCRIPT_DIR/redis/install.sh" remove
         ;;
       redis)
         "$SCRIPT_DIR/redis/install.sh" remove
+        ;;
+      postgres)
+        "$SCRIPT_DIR/postgres/install.sh" remove
         ;;
       mailpit)
         "$SCRIPT_DIR/mailpit/install.sh" remove
@@ -66,3 +74,4 @@ case "$action" in
     esac
     ;;
 esac
+

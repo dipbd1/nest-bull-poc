@@ -1,6 +1,8 @@
 import { registerAs } from '@nestjs/config';
 import process from 'node:process';
 import { assertAiEnv } from './ai.config.js';
+import { assertAuthEnv } from './auth.config.js';
+import { assertDatabaseEnv } from './database.config.js';
 
 try {
   process.loadEnvFile();
@@ -26,6 +28,8 @@ export function validateEnv(config: Record<string, unknown>) {
   }
 
   assertAiEnv(config);
+  assertDatabaseEnv(config);
+  assertAuthEnv(config);
   return config;
 }
 
