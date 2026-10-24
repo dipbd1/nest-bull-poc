@@ -21,6 +21,9 @@ const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-5';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 const DEFAULT_COMPATIBLE_NAME = 'openai-compatible';
+const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-4o-mini';
+const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const DEFAULT_OPENROUTER_NAME = 'openrouter';
 
 export interface AiProviderSettings {
   apiKey: string;
@@ -28,6 +31,7 @@ export interface AiProviderSettings {
   embeddingModel: string;
   baseUrl: string;
   name: string;
+  headers: Record<string, string>;
 }
 
 export interface AiConfig {
@@ -77,6 +81,15 @@ function readDefaultProvider(): AiProviderName {
   return raw;
 }
 
+function openRouterHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const siteUrl = readString(process.env.OPENROUTER_SITE_URL);
+  const appName = readString(process.env.OPENROUTER_APP_NAME);
+  if (siteUrl) headers['HTTP-Referer'] = siteUrl;
+  if (appName) headers['X-Title'] = appName;
+  return headers;
+}
+
 export const aiConfig = registerAs('ai', (): AiConfig => ({
   defaultProvider: readDefaultProvider(),
   timeoutMs: readNumber(process.env.AI_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
@@ -90,6 +103,7 @@ export const aiConfig = registerAs('ai', (): AiConfig => ({
         DEFAULT_OPENAI_EMBEDDING_MODEL,
       baseUrl: readString(process.env.OPENAI_BASE_URL),
       name: '',
+      headers: {},
     },
     anthropic: {
       apiKey: readString(process.env.ANTHROPIC_API_KEY),
@@ -97,6 +111,7 @@ export const aiConfig = registerAs('ai', (): AiConfig => ({
       embeddingModel: '',
       baseUrl: readString(process.env.ANTHROPIC_BASE_URL),
       name: '',
+      headers: {},
     },
     gemini: {
       apiKey: readString(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
@@ -106,6 +121,7 @@ export const aiConfig = registerAs('ai', (): AiConfig => ({
         DEFAULT_GEMINI_EMBEDDING_MODEL,
       baseUrl: readString(process.env.GEMINI_BASE_URL),
       name: '',
+      headers: {},
     },
     'openai-compatible': {
       apiKey: readString(process.env.OPENAI_COMPATIBLE_API_KEY),
@@ -115,6 +131,18 @@ export const aiConfig = registerAs('ai', (): AiConfig => ({
       name:
         readString(process.env.OPENAI_COMPATIBLE_NAME) ||
         DEFAULT_COMPATIBLE_NAME,
+      headers: {},
+    },
+    openrouter: {
+      apiKey: readString(process.env.OPENROUTER_API_KEY),
+      model:
+        readString(process.env.OPENROUTER_MODEL) || DEFAULT_OPENROUTER_MODEL,
+      embeddingModel: readString(process.env.OPENROUTER_EMBEDDING_MODEL),
+      baseUrl:
+        readString(process.env.OPENROUTER_BASE_URL) ||
+        DEFAULT_OPENROUTER_BASE_URL,
+      name: DEFAULT_OPENROUTER_NAME,
+      headers: openRouterHeaders(),
     },
   },
 }));

@@ -63,6 +63,12 @@ const AI_ENV_KEYS = [
   'OPENAI_COMPATIBLE_EMBEDDING_MODEL',
   'OPENAI_COMPATIBLE_BASE_URL',
   'OPENAI_COMPATIBLE_NAME',
+  'OPENROUTER_API_KEY',
+  'OPENROUTER_MODEL',
+  'OPENROUTER_EMBEDDING_MODEL',
+  'OPENROUTER_BASE_URL',
+  'OPENROUTER_SITE_URL',
+  'OPENROUTER_APP_NAME',
 ] as const;
 
 const languageUsage = {
@@ -82,6 +88,7 @@ const baseConfig: AiConfig = {
       embeddingModel: 'text-embedding-3-small',
       baseUrl: '',
       name: '',
+      headers: {},
     },
     anthropic: {
       apiKey: 'sk-anthropic',
@@ -89,6 +96,7 @@ const baseConfig: AiConfig = {
       embeddingModel: '',
       baseUrl: '',
       name: '',
+      headers: {},
     },
     gemini: {
       apiKey: 'gk-gemini',
@@ -96,6 +104,7 @@ const baseConfig: AiConfig = {
       embeddingModel: 'gemini-embedding-001',
       baseUrl: '',
       name: '',
+      headers: {},
     },
     'openai-compatible': {
       apiKey: '',
@@ -103,6 +112,15 @@ const baseConfig: AiConfig = {
       embeddingModel: '',
       baseUrl: '',
       name: 'openai-compatible',
+      headers: {},
+    },
+    openrouter: {
+      apiKey: 'sk-or',
+      model: 'openai/gpt-4o-mini',
+      embeddingModel: '',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      name: 'openrouter',
+      headers: {},
     },
   },
 };
@@ -211,6 +229,15 @@ describe('aiConfig', () => {
         embeddingModel: '',
         baseUrl: '',
         name: 'openai-compatible',
+        headers: {},
+      });
+      expect(config.providers.openrouter).toEqual({
+        apiKey: '',
+        model: 'openai/gpt-4o-mini',
+        embeddingModel: '',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        name: 'openrouter',
+        headers: {},
       });
     });
   });
@@ -235,6 +262,12 @@ describe('aiConfig', () => {
         OPENAI_COMPATIBLE_MODEL: 'llama3.1',
         OPENAI_COMPATIBLE_EMBEDDING_MODEL: 'nomic-embed-text',
         OPENAI_COMPATIBLE_NAME: 'ollama',
+        OPENROUTER_API_KEY: 'sk-or-env',
+        OPENROUTER_MODEL: 'anthropic/claude-sonnet-4.5',
+        OPENROUTER_EMBEDDING_MODEL: 'openai/text-embedding-3-small',
+        OPENROUTER_BASE_URL: 'https://openrouter.example/v1',
+        OPENROUTER_SITE_URL: 'https://app.example',
+        OPENROUTER_APP_NAME: 'queue-console',
       },
       () => {
         const config = aiConfig();
@@ -260,6 +293,17 @@ describe('aiConfig', () => {
           embeddingModel: 'nomic-embed-text',
           name: 'ollama',
         });
+        expect(config.providers.openrouter).toMatchObject({
+          apiKey: 'sk-or-env',
+          model: 'anthropic/claude-sonnet-4.5',
+          embeddingModel: 'openai/text-embedding-3-small',
+          baseUrl: 'https://openrouter.example/v1',
+          name: 'openrouter',
+          headers: {
+            'HTTP-Referer': 'https://app.example',
+            'X-Title': 'queue-console',
+          },
+        });
       },
     );
   });
@@ -267,9 +311,12 @@ describe('aiConfig', () => {
 
 describe('validateEnv', () => {
   it('allows empty AI settings and a known provider', () => {
-    expect(validateEnv({})).toEqual({});
+    expect(validateEnv({ DATABASE_URL: 'postgres://localhost/test' })).toEqual({
+      DATABASE_URL: 'postgres://localhost/test',
+    });
     expect(
       validateEnv({
+        DATABASE_URL: 'postgres://localhost/test',
         AI_DEFAULT_PROVIDER: '',
         AI_TIMEOUT_MS: '',
         AI_MAX_RETRIES: '',
@@ -278,6 +325,7 @@ describe('validateEnv', () => {
     ).toMatchObject({ OPENAI_API_KEY: '' });
     expect(
       validateEnv({
+        DATABASE_URL: 'postgres://localhost/test',
         AI_DEFAULT_PROVIDER: ' gemini ',
         AI_TIMEOUT_MS: '1500',
         AI_MAX_RETRIES: 0,
@@ -287,7 +335,7 @@ describe('validateEnv', () => {
 
   it('rejects an unknown AI_DEFAULT_PROVIDER', () => {
     expect(() => validateEnv({ AI_DEFAULT_PROVIDER: 'azure' })).toThrow(
-      'AI_DEFAULT_PROVIDER must be one of: openai, anthropic, gemini, openai-compatible',
+      'AI_DEFAULT_PROVIDER must be one of: openai, anthropic, gemini, openai-compatible, openrouter',
     );
   });
 
@@ -457,6 +505,70 @@ describe('AiService', () => {
     expect(call.messages[0]?.content[1]?.image).toBeInstanceOf(URL);
     expect(call.messages[0]?.content[1]?.image?.href).toBe(
       'https://example.com/cat.png',
+    );
+  });
+
+  it('connects to OpenRouter with configured headers', async () => {
+    const routed = await createService({
+      ...baseConfig,
+      providers: {
+        ...baseConfig.providers,
+        openrouter: {
+          ...baseConfig.providers.openrouter,
+          headers: {
+            'HTTP-Referer': 'https://app.example',
+            'X-Title': 'queue-console',
+          },
+        },
+      },
+    });
+
+    const result = await routed.generateText({
+      provider: 'openrouter',
+      prompt: 'job text',
+    });
+
+    expect(createOpenAICompatible).toHaveBeenCalledWith({
+      name: 'openrouter',
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: 'sk-or',
+      headers: {
+        'HTTP-Referer': 'https://app.example',
+        'X-Title': 'queue-console',
+      },
+    });
+    expect(providerAt(createOpenAICompatible).mock.calls[0]?.[0]).toBe(
+      'openai/gpt-4o-mini',
+    );
+    expect(createOpenAI).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      provider: 'openrouter',
+      model: 'openai/gpt-4o-mini',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      text: 'hello',
+    });
+  });
+
+  it('lets a call replace OpenRouter headers', async () => {
+    const routed = await createService({
+      ...baseConfig,
+      providers: {
+        ...baseConfig.providers,
+        openrouter: {
+          ...baseConfig.providers.openrouter,
+          headers: { 'X-Title': 'from-env' },
+        },
+      },
+    });
+
+    await routed.generateText({
+      provider: 'openrouter',
+      headers: { 'X-Title': 'override' },
+      prompt: 'hi',
+    });
+
+    expect(createOpenAICompatible).toHaveBeenCalledWith(
+      expect.objectContaining({ headers: { 'X-Title': 'override' } }),
     );
   });
 
@@ -693,6 +805,28 @@ describe('AiService', () => {
       'API key is not configured for openai',
     );
     expect(createOpenAI).not.toHaveBeenCalled();
+    expect(generateText).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing OpenRouter API key', async () => {
+    const bare = await createService({
+      ...baseConfig,
+      providers: {
+        ...baseConfig.providers,
+        openrouter: { ...baseConfig.providers.openrouter, apiKey: '' },
+      },
+    });
+
+    await expect(
+      bare.generateText({ provider: 'openrouter', prompt: 'hi' }),
+    ).rejects.toMatchObject({
+      name: 'AiProviderNotConfiguredError',
+      provider: 'openrouter',
+    });
+    await expect(
+      bare.generateText({ provider: 'openrouter', prompt: 'hi' }),
+    ).rejects.toThrow('API key is not configured for openrouter');
+    expect(createOpenAICompatible).not.toHaveBeenCalled();
     expect(generateText).not.toHaveBeenCalled();
   });
 

@@ -7,6 +7,7 @@ import { ProducerModule } from './producer/producer.module.js';
 
 import { ConfigModule } from '@nestjs/config';
 import { ConsumerModule } from './consumer/consumer.module.js';
+import { ConversationModule } from './conversation/conversation.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -30,6 +31,7 @@ import { DatabaseModule } from './database/database.module.js';
     DatabaseModule,
     AiModule,
     AuthModule,
+    ConversationModule,
     QueueModule,
     ProducerModule,
     ConsumerModule,

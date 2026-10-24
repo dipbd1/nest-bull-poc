@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { OpenRouterCatalogService } from '../ai/openrouter-catalog.service.js';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { jobQueueName } from '../config/queue.config.js';
 import { ProducerController } from './producer.controller.js';
@@ -20,6 +21,10 @@ describe('ProducerController', () => {
             getJobs: vi.fn(),
             getJob: vi.fn(),
           },
+        },
+        {
+          provide: OpenRouterCatalogService,
+          useValue: { listFreeModels: vi.fn(), assertFreeModel: vi.fn() },
         },
       ],
     })

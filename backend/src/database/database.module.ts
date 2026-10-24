@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RegistrationCode } from '../auth/entities/registration-code.entity.js';
 import { User } from '../auth/entities/user.entity.js';
+import { ConversationMessage } from '../conversation/entities/conversation-message.entity.js';
+import { Conversation } from '../conversation/entities/conversation.entity.js';
 import type { DatabaseConfig } from '../config/database.config.js';
 
 @Module({
@@ -15,7 +17,7 @@ import type { DatabaseConfig } from '../config/database.config.js';
           type: 'postgres' as const,
           url: database.url,
           ssl: true,
-          entities: [User, RegistrationCode],
+          entities: [User, RegistrationCode, Conversation, ConversationMessage],
           synchronize: true,
           uuidExtension: 'pgcrypto' as const,
           extra: {

@@ -3,6 +3,9 @@ import type {
   AuthTokenResponse,
   AuthUser,
   ConsumerStatus,
+  ConversationDetail,
+  ConversationSummary,
+  FreeModel,
   ProducerJob,
   ProducerPayload,
   QueueStatus,
@@ -130,6 +133,10 @@ export function listJobs() {
   return request<ProducerJob[]>('/producer')
 }
 
+export function listFreeModels() {
+  return request<FreeModel[]>('/producer/models')
+}
+
 export function createJob(payload: ProducerPayload) {
   return request<ProducerPayload>('/producer', {
     method: 'POST',
@@ -160,5 +167,20 @@ export function setConsumerRunning(running: boolean) {
   return request<ConsumerStatus>('/consumer', {
     method: 'PATCH',
     body: JSON.stringify({ running }),
+  })
+}
+
+export function listConversations() {
+  return request<ConversationSummary[]>('/conversations')
+}
+
+export function getConversation(id: string) {
+  return request<ConversationDetail>(`/conversations/${id}`)
+}
+
+export function sendConversationMessage(id: string, content: string) {
+  return request<ConversationDetail>(`/conversations/${id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
   })
 }

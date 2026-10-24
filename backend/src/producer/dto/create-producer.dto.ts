@@ -8,4 +8,8 @@ export class CreateProducerDto {
   @IsString()
   @IsNotEmpty()
   description: string;
+
+  @IsString()
+  @IsNotEmpty()
+  model: string;
 }

@@ -9,6 +9,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard.js';
+import { CurrentUser } from '../auth/current-user.decorator.js';
+import type { JwtPayload } from '../auth/auth.types.js';
 import { CreateProducerDto } from './dto/create-producer.dto.js';
 import { UpdateProducerDto } from './dto/update-producer.dto.js';
 import { ProducerService } from './producer.service.js';
@@ -19,13 +21,21 @@ export class ProducerController {
   constructor(private readonly producerService: ProducerService) {}
 
   @Post()
-  create(@Body() createProducerDto: CreateProducerDto) {
-    return this.producerService.create(createProducerDto);
+  create(
+    @CurrentUser() user: JwtPayload,
+    @Body() createProducerDto: CreateProducerDto,
+  ) {
+    return this.producerService.create(createProducerDto, user.sub);
   }
 
   @Get()
   findAll() {
     return this.producerService.findAll();
+  }
+
+  @Get('models')
+  listModels() {
+    return this.producerService.listFreeModels();
   }
 
   @Get(':id')

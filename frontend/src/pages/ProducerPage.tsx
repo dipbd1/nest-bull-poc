@@ -4,16 +4,19 @@ import {
   createJob,
   deleteAllJobs,
   deleteJob,
+  listFreeModels,
   listJobs,
   updateJob,
 } from '../api.ts'
-import type { LayoutContext, ProducerJob } from '../types.ts'
+import { ModelPicker } from '../components/ModelPicker.tsx'
+import type { FreeModel, LayoutContext, ProducerJob, ProducerPayload } from '../types.ts'
 
-const emptyForm = { name: '', description: '' }
+const emptyForm: ProducerPayload = { name: '', description: '', model: '' }
 
 export function ProducerPage() {
   const { refreshStatus } = useOutletContext<LayoutContext>()
   const [jobs, setJobs] = useState<ProducerJob[]>([])
+  const [models, setModels] = useState<FreeModel[]>([])
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState(emptyForm)
@@ -25,6 +28,28 @@ export function ProducerPage() {
     setJobs(next)
     await refreshStatus()
   }
+
+  useEffect(() => {
+    let cancelled = false
+    void listFreeModels()
+      .then((next) => {
+        if (cancelled) return
+        setModels(next)
+        setForm((current) =>
+          current.model ? current : { ...current, model: next[0]?.id ?? '' },
+        )
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : 'Failed to load free models',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -48,7 +73,7 @@ export function ProducerPage() {
     setError(null)
     try {
       await createJob(form)
-      setForm(emptyForm)
+      setForm((current) => ({ ...emptyForm, model: current.model }))
       await reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to enqueue job')
@@ -129,6 +154,14 @@ export function ProducerPage() {
             required
           />
         </label>
+        <ModelPicker
+          label="Model"
+          models={models}
+          value={form.model}
+          onChange={(model) =>
+            setForm((current) => ({ ...current, model }))
+          }
+        />
         <label>
           Description
           <textarea
@@ -144,7 +177,7 @@ export function ProducerPage() {
             rows={3}
           />
         </label>
-        <button type="submit" disabled={busy}>
+        <button type="submit" disabled={busy || !form.model}>
           Enqueue
         </button>
       </form>
@@ -176,6 +209,32 @@ export function ProducerPage() {
                       }
                     />
                   </label>
+                  <ModelPicker
+                    label="Model"
+                    models={
+                      editForm.model &&
+                      !models.some((model) => model.id === editForm.model)
+                        ? [
+                            {
+                              id: editForm.model,
+                              name: editForm.model,
+                              description: '',
+                              contextLength: null,
+                              maxOutputTokens: null,
+                              inputModalities: [],
+                              intelligenceIndex: null,
+                              codingIndex: null,
+                              agenticIndex: null,
+                            },
+                            ...models,
+                          ]
+                        : models
+                    }
+                    value={editForm.model}
+                    onChange={(model) =>
+                      setEditForm((current) => ({ ...current, model }))
+                    }
+                  />
                   <label>
                     Description
                     <textarea
@@ -209,7 +268,16 @@ export function ProducerPage() {
               ) : (
                 <>
                   <h2>{job.data.name}</h2>
+                  <p className="muted">
+                    {job.data.model
+                      ? (models.find((model) => model.id === job.data.model)
+                          ?.name ?? job.data.model)
+                      : 'No model selected'}
+                  </p>
                   <p>{job.data.description}</p>
+                  {job.failedReason ? (
+                    <p className="error">{job.failedReason}</p>
+                  ) : null}
                   <div className="actions">
                     <button
                       type="button"
@@ -219,6 +287,7 @@ export function ProducerPage() {
                         setEditForm({
                           name: job.data.name,
                           description: job.data.description,
+                          model: job.data.model ?? '',
                         })
                       }}
                     >

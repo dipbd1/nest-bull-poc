@@ -37,6 +37,15 @@ function pickNumber(
   return fallback;
 }
 
+function pickHeaders(
+  ...values: Array<Record<string, string> | undefined>
+): Record<string, string> | undefined {
+  for (const value of values) {
+    if (value && Object.keys(value).length > 0) return value;
+  }
+  return undefined;
+}
+
 export function resolveAiConnection(
   config: AiConfig,
   adapterOverrides: AiConnectionOverrides = {},
@@ -72,7 +81,11 @@ export function resolveAiConnection(
       adapterOverrides.apiKey,
       providerConfig.apiKey,
     ),
-    headers: callOverrides.headers ?? adapterOverrides.headers,
+    headers: pickHeaders(
+      callOverrides.headers,
+      adapterOverrides.headers,
+      providerConfig.headers,
+    ),
     name: pickString(
       callOverrides.name,
       adapterOverrides.name,
@@ -168,13 +181,13 @@ function compatibleProviderSettings(connection: ResolvedAiConnection): {
 } {
   if (!connection.baseUrl) {
     throw new AiProviderNotConfiguredError(
-      'openai-compatible',
-      'Base URL is not configured for openai-compatible',
+      connection.provider,
+      `Base URL is not configured for ${connection.provider}`,
     );
   }
 
   return {
-    name: connection.name ?? 'openai-compatible',
+    name: connection.name ?? connection.provider,
     baseURL: connection.baseUrl,
     ...(connection.apiKey ? { apiKey: connection.apiKey } : {}),
     ...(connection.headers ? { headers: connection.headers } : {}),
@@ -199,6 +212,7 @@ export function createChatModel(
         connection.model,
       );
     case 'openai-compatible':
+    case 'openrouter':
       return createOpenAICompatible(compatibleProviderSettings(connection))(
         connection.model,
       );
@@ -222,6 +236,7 @@ export function createEmbeddingModel(
         officialProviderSettings(connection),
       ).embedding(connection.embeddingModel);
     case 'openai-compatible':
+    case 'openrouter':
       // This provider exposes embeddingModel(), not embedding().
       return createOpenAICompatible(
         compatibleProviderSettings(connection),

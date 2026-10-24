@@ -72,7 +72,8 @@ p {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -236,7 +237,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -316,4 +318,246 @@ button:disabled {
 .consumer-state {
   font-size: 1.2rem;
   color: var(--text-h);
+}
+
+.chat-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.chat-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.chat-item {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  background: var(--bg);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+}
+
+.chat-item.active {
+  border-color: var(--accent);
+}
+
+.chat-item-title {
+  font-weight: 600;
+}
+
+.chat-item-preview {
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-thread {
+  min-height: 360px;
+}
+
+.chat-thread-header {
+  display: grid;
+  gap: 4px;
+}
+
+.chat-messages {
+  display: grid;
+  gap: 10px;
+}
+
+.chat-bubble {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.chat-bubble-user {
+  background: var(--bg);
+}
+
+.chat-bubble-assistant {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+}
+
+.chat-role {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.chat-composer {
+  display: grid;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.model-picker {
+  position: relative;
+  display: grid;
+  gap: 6px;
+}
+
+.model-picker-label {
+  font-size: 0.9rem;
+  color: var(--text-h);
+}
+
+button.model-picker-trigger {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: var(--bg);
+  color: var(--text-h);
+  border: 1px solid var(--border);
+}
+
+.model-picker-caret {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.model-picker-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+button.model-option {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  background: transparent;
+  color: var(--text-h);
+  border: 0;
+  border-radius: 8px;
+}
+
+button.model-option:hover,
+button.model-option:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+button.model-option.is-selected {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.model-option-name {
+  font-weight: 600;
+}
+
+.model-option-meta {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.model-popover {
+  position: fixed;
+  z-index: 30;
+  width: 300px;
+  max-height: min(300px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.model-popover-body {
+  display: grid;
+  gap: 8px;
+}
+
+.model-popover-name {
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.model-popover-id {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
+.model-popover-copy {
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.model-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.model-chip {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.model-chip-free,
+.model-chip-score-high {
+  background: color-mix(in srgb, var(--completed) 18%, transparent);
+  color: var(--completed);
+}
+
+.model-chip-context-lg,
+.model-chip-score-mid {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.model-chip-context-md,
+.model-chip-output {
+  background: color-mix(in srgb, var(--active) 18%, transparent);
+  color: var(--active);
+}
+
+.model-chip-context-sm,
+.model-chip-score-low {
+  background: color-mix(in srgb, var(--waiting) 20%, transparent);
+  color: var(--waiting);
+}
+
+.model-chip-modality {
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+  color: var(--text);
 }
