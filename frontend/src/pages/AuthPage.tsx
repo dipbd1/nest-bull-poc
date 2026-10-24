@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { getAuthConfig } from '../api.ts'
 import { useAuth } from '../auth.tsx'
 
 type AuthMode = 'login' | 'register' | 'verify'
@@ -22,6 +23,26 @@ export function AuthPage() {
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [emailVerificationRequired, setEmailVerificationRequired] =
+    useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void getAuthConfig()
+      .then((config) => {
+        if (!cancelled) {
+          setEmailVerificationRequired(config.emailVerificationRequired)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEmailVerificationRequired(true)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function goTo(next: AuthMode) {
     setMode(next)
@@ -57,10 +78,14 @@ export function AuthPage() {
     setBusy(true)
     setError(null)
     try {
-      const registeredEmail = await register(email, password)
-      setEmail(registeredEmail)
-      setPassword('')
-      setMode('verify')
+      const result = await register(email, password)
+      if (result.verificationRequired) {
+        setEmail(result.email)
+        setPassword('')
+        setMode('verify')
+        return
+      }
+      await continueToApp()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to register')
     } finally {
@@ -88,8 +113,10 @@ export function AuthPage() {
         <p className="brand">Queue console</p>
         <h1>{mode === 'login' ? 'Sign in' : mode === 'register' ? 'Register' : 'Verify email'}</h1>
         <p className="muted">
-          Producer and consumer actions require an account. Registration codes
-          land in Mailpit.
+          Producer and consumer actions require an account.
+          {emailVerificationRequired
+            ? ' Registration codes land in Mailpit.'
+            : null}
         </p>
       </header>
 
@@ -177,15 +204,17 @@ export function AuthPage() {
               required
             />
           </label>
-          <p className="hint">
-            After you register, open{' '}
-            <a href="http://localhost:8025" target="_blank" rel="noreferrer">
-              Mailpit
-            </a>{' '}
-            to copy the 6-digit code.
-          </p>
+          {emailVerificationRequired ? (
+            <p className="hint">
+              After you register, open{' '}
+              <a href="http://localhost:8025" target="_blank" rel="noreferrer">
+                Mailpit
+              </a>{' '}
+              to copy the 6-digit code.
+            </p>
+          ) : null}
           <button type="submit" disabled={busy}>
-            Send code
+            {emailVerificationRequired ? 'Send code' : 'Create account'}
           </button>
         </form>
       ) : null}

@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ProducerModule } from './producer/producer.module.js';
@@ -18,7 +20,10 @@ import { DatabaseModule } from './database/database.module.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: [
+        resolve(dirname(fileURLToPath(import.meta.url)), '../.env'),
+        resolve(dirname(fileURLToPath(import.meta.url)), '../../.env.local'),
+      ],
       load: [queueConfig, aiConfig, databaseConfig, authConfig],
       validate: validateEnv,
     }),

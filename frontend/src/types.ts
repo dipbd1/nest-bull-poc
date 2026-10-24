@@ -41,7 +41,10 @@ export type AuthTokenResponse = {
   accessToken: string
 }
 
-export type RegisterResponse = {
-  email: string
-  verificationRequired: true
+export type AuthPublicConfig = {
+  emailVerificationRequired: boolean
 }
+
+export type RegisterResponse =
+  | { email: string; verificationRequired: true }
+  | { email: string; verificationRequired: false; accessToken: string }

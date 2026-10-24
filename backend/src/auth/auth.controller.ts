@@ -19,6 +19,11 @@ import { VerifyRegistrationDto } from './dto/verify-registration.dto.js';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Get('config')
+  config() {
+    return this.authService.getPublicConfig();
+  }
+
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);

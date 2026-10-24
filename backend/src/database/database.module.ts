@@ -13,14 +13,15 @@ import type { DatabaseConfig } from '../config/database.config.js';
         const database = configService.getOrThrow<DatabaseConfig>('database');
         return {
           type: 'postgres' as const,
-          host: database.host,
-          port: database.port,
-          username: database.user,
-          password: database.password,
-          database: database.name,
+          url: database.url,
+          ssl: true,
           entities: [User, RegistrationCode],
           synchronize: true,
           uuidExtension: 'pgcrypto' as const,
+          extra: {
+            max: 10,
+            connectionTimeoutMillis: 10_000,
+          },
         };
       },
     }),

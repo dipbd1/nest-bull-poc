@@ -23,7 +23,10 @@ type AuthContextValue = {
   user: AuthUser | null
   ready: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<string>
+  register: (
+    email: string,
+    password: string,
+  ) => Promise<{ email: string; verificationRequired: boolean }>
   verify: (email: string, code: string) => Promise<void>
   logout: () => void
 }
@@ -80,7 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async register(email, password) {
         const result = await registerRequest(email, password)
-        return result.email
+        if (!result.verificationRequired) {
+          setAccessToken(result.accessToken)
+          setUser(await getMe())
+        }
+        return {
+          email: result.email,
+          verificationRequired: result.verificationRequired,
+        }
       },
       async verify(email, code) {
         const { accessToken } = await verifyRegistration(email, code)

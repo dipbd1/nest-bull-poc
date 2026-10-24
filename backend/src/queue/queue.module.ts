@@ -7,12 +7,21 @@ import { QueueController } from './queue.controller.js';
 @Module({
   imports: [
     BullModule.forRootAsync({
-      useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('queue.redis.host'),
-          port: configService.get<number>('queue.redis.port'),
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const username = configService.get<string>('queue.redis.username');
+        const password = configService.get<string>('queue.redis.password');
+        const useTls = configService.get<boolean>('queue.redis.tls');
+
+        return {
+          connection: {
+            host: configService.get<string>('queue.redis.host'),
+            port: configService.get<number>('queue.redis.port'),
+            ...(username ? { username } : {}),
+            ...(password ? { password } : {}),
+            ...(useTls ? { tls: {} } : {}),
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     BullModule.registerQueue({

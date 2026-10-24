@@ -20,7 +20,11 @@ import {
   verifyPassword,
   verifyRegistrationCode,
 } from './auth.crypto.js';
-import type { AuthUser } from './auth.types.js';
+import type {
+  AuthPublicConfig,
+  AuthUser,
+  RegisterResult,
+} from './auth.types.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { VerifyRegistrationDto } from './dto/verify-registration.dto.js';
@@ -43,15 +47,23 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  async register(
-    dto: RegisterDto,
-  ): Promise<{ email: string; verificationRequired: true }> {
+  getPublicConfig(): AuthPublicConfig {
+    return {
+      emailVerificationRequired: this.authConfig().emailVerificationRequired,
+    };
+  }
+
+  async register(dto: RegisterDto): Promise<RegisterResult> {
     const auth = this.authConfig();
     const email = normalizeEmail(dto.email);
     const existing = await this.users.findOne({ where: { email } });
 
     if (existing?.emailVerifiedAt) {
       throw new ConflictException('Email is already registered');
+    }
+
+    if (!auth.emailVerificationRequired) {
+      return this.registerWithoutVerification(email, dto.password, existing);
     }
 
     if (existing) {
@@ -136,7 +148,7 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
-    if (!user.emailVerifiedAt) {
+    if (this.authConfig().emailVerificationRequired && !user.emailVerifiedAt) {
       throw new ForbiddenException('Email is not verified');
     }
 
@@ -153,6 +165,34 @@ export class AuthService {
       id: user.id,
       email: user.email,
       emailVerifiedAt: user.emailVerifiedAt,
+    };
+  }
+
+  private async registerWithoutVerification(
+    email: string,
+    password: string,
+    existing: User | null,
+  ): Promise<Extract<RegisterResult, { verificationRequired: false }>> {
+    const passwordHash = await hashPassword(password);
+    const verifiedAt = new Date();
+    if (existing) {
+      existing.passwordHash = passwordHash;
+      existing.emailVerifiedAt = verifiedAt;
+    }
+    const user = existing
+      ? await this.users.save(existing)
+      : await this.users.save(
+          this.users.create({
+            email,
+            passwordHash,
+            emailVerifiedAt: verifiedAt,
+          }),
+        );
+
+    return {
+      email,
+      verificationRequired: false,
+      accessToken: await this.signToken(user),
     };
   }
 

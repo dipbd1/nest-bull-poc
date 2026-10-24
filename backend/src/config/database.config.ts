@@ -1,43 +1,46 @@
 import { registerAs } from '@nestjs/config';
+import { dirname, resolve } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
-try {
-  process.loadEnvFile();
-} catch {
-  // Missing .env is fine; tests and shell-provided env still start.
-}
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const envFiles = [
+  resolve(moduleDir, '../../.env'),
+  resolve(moduleDir, '../../../.env'),
+  resolve(moduleDir, '../../../.env.local'),
+];
 
-const DEFAULT_HOST = 'localhost';
-const DEFAULT_PORT = 5432;
-const DEFAULT_USER = 'app';
-const DEFAULT_PASSWORD = 'app';
-const DEFAULT_NAME = 'app';
-
-export interface DatabaseConfig {
-  host: string;
-  port: number;
-  user: string;
-  password: string;
-  name: string;
-}
-
-export function assertDatabaseEnv(config: Record<string, unknown>): void {
-  const port = config.POSTGRES_PORT;
-  if (port !== undefined && port !== '' && Number.isNaN(Number(port))) {
-    throw new Error('POSTGRES_PORT must be a number');
+for (const file of envFiles) {
+  try {
+    process.loadEnvFile(file);
+  } catch {
+    // Missing env files are fine; shell-provided env still starts the app.
   }
 }
 
-export const databaseConfig = registerAs(
-  'database',
-  (): DatabaseConfig => ({
-    host: process.env.POSTGRES_HOST?.trim() || DEFAULT_HOST,
-    port: Number.parseInt(
-      process.env.POSTGRES_PORT ?? String(DEFAULT_PORT),
-      10,
-    ),
-    user: process.env.POSTGRES_USER?.trim() || DEFAULT_USER,
-    password: process.env.POSTGRES_PASSWORD?.trim() || DEFAULT_PASSWORD,
-    name: process.env.POSTGRES_DB?.trim() || DEFAULT_NAME,
-  }),
-);
+export interface DatabaseConfig {
+  url: string;
+}
+
+export function assertDatabaseEnv(config: Record<string, unknown>): void {
+  const url = config.DATABASE_URL;
+  if (typeof url !== 'string' || url.trim() === '') {
+    throw new Error('DATABASE_URL is required');
+  }
+}
+
+function withConnectTimeout(connectionString: string): string {
+  if (/[?&]connect_timeout=/.test(connectionString)) {
+    return connectionString;
+  }
+  const separator = connectionString.includes('?') ? '&' : '?';
+  return `${connectionString}${separator}connect_timeout=10`;
+}
+
+export const databaseConfig = registerAs('database', (): DatabaseConfig => {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new Error('DATABASE_URL is required');
+  }
+  return { url: withConnectTimeout(url) };
+});

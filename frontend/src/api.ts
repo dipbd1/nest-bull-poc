@@ -1,4 +1,5 @@
 import type {
+  AuthPublicConfig,
   AuthTokenResponse,
   AuthUser,
   ConsumerStatus,
@@ -87,6 +88,10 @@ async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
   }
 
   return response.json() as Promise<T>
+}
+
+export function getAuthConfig() {
+  return request<AuthPublicConfig>('/auth/config', { auth: false })
 }
 
 export function register(email: string, password: string) {

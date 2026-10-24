@@ -29,6 +29,7 @@ const authConfig: AuthConfig = {
   codeTtlMs: 10 * 60 * 1000,
   codeMaxAttempts: 5,
   resendWindowMs: 60 * 1000,
+  emailVerificationRequired: true,
 };
 
 function makeUser(overrides: Partial<User> = {}): User {
@@ -74,6 +75,7 @@ describe('AuthService', () => {
   let jwt: { signAsync: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    authConfig.emailVerificationRequired = true;
     users = {
       findOne: vi.fn(),
       save: vi.fn(async (user: User) => {
@@ -138,7 +140,11 @@ describe('AuthService', () => {
     const sentCode = mail.sendRegistrationCode.mock.calls[0][1] as string;
     const savedCode = codes.save.mock.calls[0][0] as RegistrationCode;
     expect(
-      verifyRegistrationCode(sentCode, savedCode.codeHash, authConfig.jwtSecret),
+      verifyRegistrationCode(
+        sentCode,
+        savedCode.codeHash,
+        authConfig.jwtSecret,
+      ),
     ).toBe(true);
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
@@ -161,9 +167,7 @@ describe('AuthService', () => {
   });
 
   it('rejects registration when the email is already verified', async () => {
-    users.findOne.mockResolvedValue(
-      makeUser({ emailVerifiedAt: new Date() }),
-    );
+    users.findOne.mockResolvedValue(makeUser({ emailVerifiedAt: new Date() }));
 
     await expect(
       service.register({ email: 'ada@example.com', password: 'password1' }),
@@ -244,6 +248,59 @@ describe('AuthService', () => {
 
     expect(result).toEqual({ accessToken: 'token' });
     expect(mail.sendRegistrationCode).not.toHaveBeenCalled();
+    expect(jwt.signAsync).toHaveBeenCalled();
+  });
+
+  it('creates a verified user and issues a token when verification is off', async () => {
+    authConfig.emailVerificationRequired = false;
+    users.findOne.mockResolvedValue(null);
+
+    const result = await service.register({
+      email: 'Ada@Example.com',
+      password: 'password1',
+    });
+
+    expect(result).toEqual({
+      email: 'ada@example.com',
+      verificationRequired: false,
+      accessToken: 'token',
+    });
+    expect(users.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'ada@example.com',
+        emailVerifiedAt: expect.any(Date),
+      }),
+    );
+    expect(mail.sendRegistrationCode).not.toHaveBeenCalled();
+    expect(codes.save).not.toHaveBeenCalled();
+    expect(jwt.signAsync).toHaveBeenCalledWith({
+      sub: 'user-1',
+      email: 'ada@example.com',
+    });
+  });
+
+  it('rejects registration when verification is off and the email is already verified', async () => {
+    authConfig.emailVerificationRequired = false;
+    users.findOne.mockResolvedValue(makeUser({ emailVerifiedAt: new Date() }));
+
+    await expect(
+      service.register({ email: 'ada@example.com', password: 'password1' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(mail.sendRegistrationCode).not.toHaveBeenCalled();
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('logs in an unverified user when verification is off', async () => {
+    authConfig.emailVerificationRequired = false;
+    const passwordHash = await hashPassword('password1');
+    users.findOne.mockResolvedValue(makeUser({ passwordHash }));
+
+    const result = await service.login({
+      email: 'ada@example.com',
+      password: 'password1',
+    });
+
+    expect(result).toEqual({ accessToken: 'token' });
     expect(jwt.signAsync).toHaveBeenCalled();
   });
 

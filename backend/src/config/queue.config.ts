@@ -17,6 +17,16 @@ const DEFAULT_REDIS_PORT = 6379;
 export const jobQueueName =
   process.env.JOB_QUEUE_NAME?.trim() || DEFAULT_QUEUE_NAME;
 
+function readOptionalString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function readTlsEnabled(value: string | undefined): boolean {
+  const raw = value?.trim().toLowerCase();
+  return raw === 'true' || raw === '1' || raw === 'yes';
+}
+
 export function validateEnv(config: Record<string, unknown>) {
   const redisPort = config.REDIS_PORT;
   if (
@@ -41,5 +51,8 @@ export const queueConfig = registerAs('queue', () => ({
       process.env.REDIS_PORT ?? String(DEFAULT_REDIS_PORT),
       10,
     ),
+    username: readOptionalString(process.env.REDIS_USERNAME),
+    password: readOptionalString(process.env.REDIS_PASSWORD),
+    tls: readTlsEnabled(process.env.REDIS_TLS),
   },
 }));
