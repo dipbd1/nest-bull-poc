@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module.js';
+import { QueueModule } from '../queue/queue.module.js';
 import { ConsumerController } from './consumer.controller.js';
 import { ConsumerProcessor } from './consumer.processor.js';
 import { ConsumerService } from './consumer.service.js';
-import { QueueModule } from '../queue/queue.module.js';
 
 @Module({
-  imports: [QueueModule],
+  imports: [QueueModule, AuthModule],
   controllers: [ConsumerController],
   providers: [ConsumerService, ConsumerProcessor],
   exports: [ConsumerProcessor],

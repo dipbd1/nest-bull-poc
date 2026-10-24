@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { AuthGuard } from '../auth/auth.guard.js';
+import { jobQueueName } from '../config/queue.config.js';
 import { ProducerController } from './producer.controller.js';
 import { ProducerService } from './producer.service.js';
-import { jobQueueName } from '../config/queue.config.js';
 
 describe('ProducerController', () => {
   let controller: ProducerController;
@@ -21,7 +22,10 @@ describe('ProducerController', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<ProducerController>(ProducerController);
   });

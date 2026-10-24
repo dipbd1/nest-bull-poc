@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { getQueueStatus } from './api.ts'
+import { useAuth } from './auth.tsx'
 import { QueueStatusBar } from './components/QueueStatusBar.tsx'
 import type { LayoutContext, QueueStatus } from './types.ts'
 
 const POLL_MS = 3000
 
 export function App() {
+  const { user, logout } = useAuth()
   const [status, setStatus] = useState<QueueStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,12 +34,18 @@ export function App() {
     <div className="shell">
       <header className="topbar">
         <p className="brand">Queue console</p>
-        <nav>
-          <NavLink to="/" end>
-            Producer
-          </NavLink>
-          <NavLink to="/consumers">Consumers</NavLink>
-        </nav>
+        <div className="topbar-end">
+          <nav>
+            <NavLink to="/" end>
+              Producer
+            </NavLink>
+            <NavLink to="/consumers">Consumers</NavLink>
+          </nav>
+          <span className="user-email">{user?.email}</span>
+          <button type="button" className="secondary" onClick={logout}>
+            Log out
+          </button>
+        </div>
       </header>
       <QueueStatusBar status={status} error={error} />
       <main>

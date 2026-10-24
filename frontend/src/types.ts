@@ -30,3 +30,18 @@ export type ConsumerStatus = {
 export type LayoutContext = {
   refreshStatus: () => Promise<void>
 }
+
+export type AuthUser = {
+  id: string
+  email: string
+  emailVerifiedAt: string | null
+}
+
+export type AuthTokenResponse = {
+  accessToken: string
+}
+
+export type RegisterResponse = {
+  email: string
+  verificationRequired: true
+}

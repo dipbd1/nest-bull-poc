@@ -1,9 +1,20 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { ProducerService } from './producer.service.js';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { AuthGuard } from '../auth/auth.guard.js';
 import { CreateProducerDto } from './dto/create-producer.dto.js';
 import { UpdateProducerDto } from './dto/update-producer.dto.js';
+import { ProducerService } from './producer.service.js';
 
 @Controller('producer')
+@UseGuards(AuthGuard)
 export class ProducerController {
   constructor(private readonly producerService: ProducerService) {}
 

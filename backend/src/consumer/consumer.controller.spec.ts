@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuthGuard } from '../auth/auth.guard.js';
 import { ConsumerController } from './consumer.controller.js';
 import { ConsumerService } from './consumer.service.js';
 
@@ -16,7 +17,10 @@ describe('ConsumerController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ConsumerController],
       providers: [{ provide: ConsumerService, useValue: consumerService }],
-    }).compile();
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get(ConsumerController);
   });

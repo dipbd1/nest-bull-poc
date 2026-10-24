@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ProducerService } from './producer.service.js';
-import { ProducerController } from './producer.controller.js';
+import { AuthModule } from '../auth/auth.module.js';
 import { QueueModule } from '../queue/queue.module.js';
+import { ProducerController } from './producer.controller.js';
+import { ProducerService } from './producer.service.js';
 
 @Module({
-  imports: [QueueModule],
+  imports: [QueueModule, AuthModule],
   controllers: [ProducerController],
   providers: [ProducerService],
 })

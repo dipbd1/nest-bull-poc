@@ -1,11 +1,19 @@
 import type {
+  AuthTokenResponse,
+  AuthUser,
   ConsumerStatus,
   ProducerJob,
   ProducerPayload,
   QueueStatus,
+  RegisterResponse,
 } from './types.ts'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
+const TOKEN_KEY = 'accessToken'
+
+type RequestOptions = RequestInit & {
+  auth?: boolean
+}
 
 export class ApiError extends Error {
   readonly status: number
@@ -16,23 +24,101 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers)
-  if (init?.body && !headers.has('Content-Type')) {
+export function getAccessToken() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setAccessToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearAccessToken() {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
+let onUnauthorized: (() => void) | null = null
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler
+}
+
+function readErrorMessage(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === 'object' && 'message' in payload) {
+    const message = (payload as { message: unknown }).message
+    if (typeof message === 'string' && message.trim()) {
+      return message
+    }
+    if (
+      Array.isArray(message) &&
+      message.every((item) => typeof item === 'string')
+    ) {
+      return message.join(', ')
+    }
+  }
+  return fallback
+}
+
+async function request<T>(path: string, init: RequestOptions = {}): Promise<T> {
+  const { auth = true, ...fetchInit } = init
+  const headers = new Headers(fetchInit.headers)
+  if (fetchInit.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(`${API_BASE}${path}`, { ...init, headers })
+  const token = auth ? getAccessToken() : null
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, { ...fetchInit, headers })
   if (!response.ok) {
+    if (response.status === 401 && token) {
+      clearAccessToken()
+      onUnauthorized?.()
+    }
     const text = await response.text()
-    throw new ApiError(response.status, text || response.statusText)
+    let message = text || response.statusText
+    try {
+      message = readErrorMessage(JSON.parse(text), message)
+    } catch {
+      // Keep the raw body when the server did not return JSON.
+    }
+    throw new ApiError(response.status, message)
   }
 
   return response.json() as Promise<T>
 }
 
+export function register(email: string, password: string) {
+  return request<RegisterResponse>('/auth/register', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export function verifyRegistration(email: string, code: string) {
+  return request<AuthTokenResponse>('/auth/register/verify', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify({ email, code }),
+  })
+}
+
+export function login(email: string, password: string) {
+  return request<AuthTokenResponse>('/auth/login', {
+    method: 'POST',
+    auth: false,
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export function getMe() {
+  return request<AuthUser>('/auth/me')
+}
+
 export function getQueueStatus() {
-  return request<QueueStatus>('/queue/status')
+  return request<QueueStatus>('/queue/status', { auth: false })
 }
 
 export function listJobs() {
