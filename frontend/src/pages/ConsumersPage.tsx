@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
 import { useOutletContext } from 'react-router'
 import {
   getConsumerStatus,
@@ -7,6 +7,12 @@ import {
   sendConversationMessage,
   setConsumerRunning,
 } from '../api.ts'
+
+const MessageContent = lazy(() =>
+  import('../components/MessageContent.tsx').then((module) => ({
+    default: module.MessageContent,
+  })),
+)
 import type {
   ConversationDetail,
   ConversationSummary,
@@ -221,7 +227,13 @@ export function ConsumersPage() {
                     <p className="chat-role">
                       {message.role === 'user' ? 'Job / you' : 'Assistant'}
                     </p>
-                    <p>{message.content}</p>
+                    {message.role === 'assistant' ? (
+                      <Suspense fallback={<p className="muted">Loading reply…</p>}>
+                        <MessageContent content={message.content} />
+                      </Suspense>
+                    ) : (
+                      <p className="chat-plain">{message.content}</p>
+                    )}
                   </article>
                 ))}
               </div>
