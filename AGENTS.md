@@ -96,6 +96,7 @@ Global `ValidationPipe`: `whitelist`, `forbidNonWhitelisted`, `transform`. Extra
 | `GET /batches`, `GET /batches/:id` | Session | Company-wide. Not scoped to the caller. |
 | `POST /batches/:id/comments` | Session | `{ comments }`, one per line. Appends rows up to 100 total and queues each one on the batch's model. Audited as `batch.add_comments` with a count, never comment text. |
 | `PATCH /batches/:id/items/:itemId` | Session | `{ finalTag }`, one of the batch tags. A blank value clears the tag. Audited. |
+| `POST /batches/:id/rerun` | Session | `{ model }`, a free OpenRouter id. Sets the batch model, then queues every `failed` comment again. Audited as `batch.rerun` with a count and the model, never comment text. `400` when none failed. `503` when OpenRouter is not connected or the queue write fails; a queue failure puts those comments back to `failed` with their previous reasons. |
 | `POST /batches/:id/accept-suggested` | Session | Sets `finalTag` only where empty. |
 | `GET /batches/:id/export` | Session | `text/csv` with `Content-Disposition`. Audited. |
 | `DELETE /batches/:id/items/:itemId` | Session | Deletes that comment, its conversation, and its pending job. Audited as `item.delete` with position and whether a conversation was removed. No comment text. |

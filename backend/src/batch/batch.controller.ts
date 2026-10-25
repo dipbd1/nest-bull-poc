@@ -21,6 +21,7 @@ import { CurrentUser } from '../auth/current-user.decorator.js';
 import { BatchService } from './batch.service.js';
 import { AddCommentsDto } from './dto/add-comments.dto.js';
 import { CreateBatchDto } from './dto/create-batch.dto.js';
+import { RerunBatchDto } from './dto/rerun-batch.dto.js';
 import { UpdateItemDto } from './dto/update-item.dto.js';
 
 function actorOf(user: RequestUser) {
@@ -74,6 +75,16 @@ export class BatchController {
     @Body() dto: UpdateItemDto,
   ) {
     return this.batches.retag(id, itemId, dto, actorOf(user));
+  }
+
+  @Post(':id/rerun')
+  @HttpCode(HttpStatus.OK)
+  rerun(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RerunBatchDto,
+  ) {
+    return this.batches.rerunFailed(id, dto, actorOf(user));
   }
 
   @Post(':id/accept-suggested')

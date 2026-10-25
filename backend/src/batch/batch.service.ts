@@ -42,6 +42,7 @@ import type {
 } from './batch.types.js';
 import { AddCommentsDto } from './dto/add-comments.dto.js';
 import { CreateBatchDto } from './dto/create-batch.dto.js';
+import { RerunBatchDto } from './dto/rerun-batch.dto.js';
 import { UpdateItemDto } from './dto/update-item.dto.js';
 import { FeedbackBatch } from './entities/feedback-batch.entity.js';
 import {
@@ -271,6 +272,74 @@ export class BatchService {
       metadata: { added: created.length, model: batch.model },
     });
     return toDetail(batch, [...existing, ...created]);
+  }
+
+  /**
+   * Points the batch at a free model and queues every failed comment again.
+   * Coded and needs-review rows are left as they are.
+   */
+  async rerunFailed(
+    batchId: string,
+    dto: RerunBatchDto,
+    actor: NonNullable<AuditActor>,
+  ): Promise<BatchDetail> {
+    if (!this.openRouter().apiKey) {
+      throw new ServiceUnavailableException(OPENROUTER_NOT_CONNECTED);
+    }
+    const batch = await this.requireBatch(batchId);
+    await this.catalog.assertFreeModel(dto.model);
+    const existing = await this.items.find({ where: { batchId } });
+    const failed = existing.filter((item) => item.status === 'failed');
+    if (failed.length === 0) {
+      throw new BadRequestException('No failed comments to run again');
+    }
+
+    batch.model = dto.model;
+    await this.batches.save(batch);
+
+    const previous = failed.map((item) => ({
+      id: item.id,
+      failedReason: item.failedReason,
+    }));
+    await this.items.update(
+      { id: In(failed.map((item) => item.id)) },
+      {
+        status: 'queued',
+        failedReason: null,
+        suggestedTag: null,
+        summary: null,
+      },
+    );
+    for (const item of failed) {
+      item.status = 'queued';
+      item.failedReason = null;
+      item.suggestedTag = null;
+      item.summary = null;
+    }
+
+    try {
+      await this.enqueue(failed);
+    } catch (error) {
+      this.logger.error(`Could not queue a rerun for batch ${batchId}`, error as Error);
+      await Promise.all(
+        previous.map((row) =>
+          this.items.update(row.id, {
+            status: 'failed',
+            failedReason: row.failedReason,
+          }),
+        ),
+      );
+      throw new ServiceUnavailableException('Could not queue the comments');
+    }
+
+    await this.audit.record({
+      actor,
+      action: 'batch.rerun',
+      targetType: 'batch',
+      targetId: batchId,
+      metadata: { rerun: failed.length, model: dto.model },
+    });
+    return toDetail(batch, existing);
   }
 
   async list(): Promise<BatchSummary[]> {

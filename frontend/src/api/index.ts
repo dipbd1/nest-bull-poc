@@ -20,6 +20,7 @@ export {
   getModelDescription,
   listBatchModels,
   listBatches,
+  rerunFailed,
   setFinalTag,
 } from './batches.ts'
 export {

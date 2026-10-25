@@ -6,6 +6,7 @@ import {
   deleteBatchItem,
   exportBatchCsv,
   getBatch,
+  rerunFailed,
   setFinalTag,
 } from '../api/index.ts'
 import { hasQueuedRows } from '../domain/batches.ts'
@@ -100,6 +101,25 @@ export function useBatch(batchId: string | undefined, pollMs = POLL_MS) {
     }
   }
 
+  /** Resolves true when the failed rows are queued again. */
+  async function rerun(model: string) {
+    if (!batchId) return false
+    const count = batch?.counts.failed ?? 0
+    const ok = await run(
+      () => rerunFailed(batchId, model),
+      'Could not run the failed comments again',
+    )
+    if (ok) {
+      setNotice(
+        count === 1
+          ? 'Running 1 failed comment again.'
+          : `Running ${count} failed comments again.`,
+      )
+      await refresh()
+    }
+    return ok
+  }
+
   async function exportCsv() {
     if (!batchId) return
     await run(async () => {
@@ -141,6 +161,7 @@ export function useBatch(batchId: string | undefined, pollMs = POLL_MS) {
     polling,
     retag,
     accept,
+    rerun,
     exportCsv,
     remove,
     addComments,

@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { In } from 'typeorm';
 import { OpenRouterCatalogService } from '../ai/openrouter-catalog.service.js';
 import type { OpenRouterModelChoice } from '../ai/openrouter-catalog.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -328,6 +329,114 @@ describe('BatchService', () => {
       service.addComments('batch-1', { comments: 'hello' }, actor),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(items.delete).toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('refuses a rerun when OpenRouter is not connected', async () => {
+    openRouterKey = '';
+
+    await expect(
+      service.rerunFailed('batch-1', { model: 'vendor/free-model:free' }, actor),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(catalog.assertFreeModel).not.toHaveBeenCalled();
+    expect(batches.save).not.toHaveBeenCalled();
+  });
+
+  it('requeues only failed comments on a new model and audits a count', async () => {
+    items.find.mockResolvedValue([
+      makeItem({ id: 'ok', status: 'coded', position: 1, finalTag: 'Praise' }),
+      makeItem({
+        id: 'bad',
+        status: 'failed',
+        position: 2,
+        failedReason: 'Coding failed',
+        finalTag: 'Bug',
+        suggestedTag: 'Bug',
+        summary: 'old',
+      }),
+      makeItem({ id: 'review', status: 'needs_review', position: 3 }),
+    ]);
+    batches.save.mockImplementation(async (value: FeedbackBatch) => value);
+    queue.addBulk.mockResolvedValue([{ id: '99' }]);
+
+    const detail = await service.rerunFailed(
+      'batch-1',
+      { model: 'vendor/free-model:free' },
+      actor,
+    );
+
+    expect(catalog.assertFreeModel).toHaveBeenCalledWith('vendor/free-model:free');
+    expect(batches.save).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'batch-1', model: 'vendor/free-model:free' }),
+    );
+    expect(items.update).toHaveBeenCalledWith(
+      { id: In(['bad']) },
+      { status: 'queued', failedReason: null, suggestedTag: null, summary: null },
+    );
+    expect(queue.addBulk).toHaveBeenCalledWith([
+      { name: FEEDBACK_ITEM_JOB, data: { itemId: 'bad' }, opts: FEEDBACK_ITEM_JOB_OPTIONS },
+    ]);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'batch.rerun',
+        targetType: 'batch',
+        targetId: 'batch-1',
+        metadata: { rerun: 1, model: 'vendor/free-model:free' },
+      }),
+    );
+    expect(JSON.stringify(audit.record.mock.calls)).not.toContain('12345');
+    expect(detail.model).toBe('vendor/free-model:free');
+    expect(detail.items.find((item) => item.id === 'bad')).toMatchObject({
+      status: 'queued',
+      failedReason: null,
+      suggestedTag: null,
+      summary: null,
+      finalTag: 'Bug',
+    });
+    expect(detail.items.find((item) => item.id === 'ok')?.status).toBe('coded');
+    expect(detail.items.find((item) => item.id === 'review')?.status).toBe('needs_review');
+  });
+
+  it('rejects a rerun model that is not free before writing', async () => {
+    catalog.assertFreeModel.mockRejectedValue(
+      new BadRequestException('Choose a free OpenRouter model'),
+    );
+
+    await expect(
+      service.rerunFailed('batch-1', { model: 'paid/model' }, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(items.find).not.toHaveBeenCalled();
+    expect(batches.save).not.toHaveBeenCalled();
+    expect(items.update).not.toHaveBeenCalled();
+    expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('refuses a rerun when no comment failed', async () => {
+    items.find.mockResolvedValue([makeItem({ status: 'coded' })]);
+
+    await expect(
+      service.rerunFailed('batch-1', { model: 'vendor/free-model:free' }, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(batches.save).not.toHaveBeenCalled();
+    expect(items.update).not.toHaveBeenCalled();
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('restores failed comments when queueing the rerun throws', async () => {
+    items.find.mockResolvedValue([
+      makeItem({ id: 'bad', status: 'failed', failedReason: 'Coding failed' }),
+    ]);
+    batches.save.mockImplementation(async (value: FeedbackBatch) => value);
+    queue.addBulk.mockRejectedValue(new Error('redis down'));
+
+    await expect(
+      service.rerunFailed('batch-1', { model: 'vendor/free-model:free' }, actor),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(items.update).toHaveBeenCalledWith('bad', {
+      status: 'failed',
+      failedReason: 'Coding failed',
+    });
     expect(audit.record).not.toHaveBeenCalled();
   });
 

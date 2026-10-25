@@ -57,6 +57,13 @@ export function setFinalTag(batchId: string, itemId: string, finalTag: string) {
   })
 }
 
+export function rerunFailed(batchId: string, model: string) {
+  return request<BatchDetail>(`/batches/${batchId}/rerun`, {
+    method: 'POST',
+    body: JSON.stringify({ model }),
+  })
+}
+
 export function acceptSuggested(batchId: string) {
   return request<{ updated: number }>(`/batches/${batchId}/accept-suggested`, {
     method: 'POST',

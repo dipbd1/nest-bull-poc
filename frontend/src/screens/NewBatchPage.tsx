@@ -151,9 +151,19 @@ export function NewBatchPage() {
                 return (
                   <div key={box.id} className={styles.comment}>
                     <div className={styles.field}>
-                      <span className={styles.index} aria-hidden="true">
-                        {number}
-                      </span>
+                      <div className={styles.tabs}>
+                        <span className={styles.index} aria-hidden="true">
+                          {number}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.close}
+                          aria-label={`Remove input ${number}`}
+                          onClick={() => removeBox(box.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
                       <textarea
                         id={`comment-${box.id}`}
                         className={styles.control}
@@ -177,9 +187,6 @@ export function NewBatchPage() {
                         }
                       />
                     </div>
-                    <Button variant="secondary" onClick={() => removeBox(box.id)}>
-                      Remove
-                    </Button>
                     {tooLong ? (
                       <Text className={styles.note} tone="error">
                         Longer than {MAX_COMMENT_LENGTH} characters.

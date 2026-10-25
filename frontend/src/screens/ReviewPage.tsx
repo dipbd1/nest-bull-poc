@@ -10,7 +10,8 @@ import {
   needsPersonCount,
   type ReviewFilter,
 } from '../domain/batches.ts'
-import { useBatch, useConsumer } from '../features/index.ts'
+import { chosenModelId, readsAndWritesText } from '../domain/models.ts'
+import { useBatch, useBatchModels, useConsumer } from '../features/index.ts'
 import { useAuth } from '../session/index.ts'
 import {
   Badge,
@@ -25,6 +26,7 @@ import {
   TextArea,
   TextLink,
 } from '../ui/index.ts'
+import { ModelField } from './ModelField.tsx'
 import { ReviewRow } from './ReviewRow.tsx'
 import styles from './ReviewPage.module.css'
 
@@ -40,6 +42,50 @@ const EMPTY_COPY: Record<ReviewFilter, string> = {
   failed: 'No comment failed.',
 }
 
+function RerunFailed({
+  failed,
+  currentModel,
+  busy,
+  onRun,
+}: {
+  failed: number
+  currentModel: string
+  busy: boolean
+  onRun: (model: string) => void
+}) {
+  const catalog = useBatchModels()
+  const [picked, setPicked] = useState(currentModel)
+  const model = chosenModelId(catalog.models, picked, catalog.defaultModel)
+  const selected = catalog.models.find((item) => item.id === model)
+  const blocked = !catalog.ready || !selected || !readsAndWritesText(selected)
+  const noModels = catalog.loaded && catalog.models.length === 0
+
+  return (
+    <Card>
+      <Stack gap="md">
+        <ModelField
+          models={catalog.models}
+          value={model}
+          loaded={catalog.loaded}
+          onChange={setPicked}
+        />
+        {noModels ? (
+          <Text tone="error">No model is available. Ask an admin to connect one.</Text>
+        ) : null}
+        {catalog.loaded && !catalog.ready && !catalog.error ? (
+          <Text tone="error">
+            OpenRouter is not connected. Ask an admin to add the key.
+          </Text>
+        ) : null}
+        {catalog.error ? <Text tone="error">{catalog.error}</Text> : null}
+        <Button disabled={busy || blocked} onClick={() => onRun(model)}>
+          Run {failed} failed again
+        </Button>
+      </Stack>
+    </Card>
+  )
+}
+
 export function ReviewPage() {
   const { batchId } = useParams()
   const navigate = useNavigate()
@@ -48,6 +94,7 @@ export function ReviewPage() {
   const consumer = useConsumer()
   const [filter, setFilter] = useState<ReviewFilter>('all')
   const [draft, setDraft] = useState('')
+  const [rerunOpen, setRerunOpen] = useState(false)
 
   const { batch } = review
 
@@ -163,6 +210,16 @@ export function ReviewPage() {
         >
           Export CSV
         </Button>
+        {batch.counts.failed > 0 ? (
+          <Button
+            variant="secondary"
+            disabled={review.busy}
+            aria-expanded={rerunOpen}
+            onClick={() => setRerunOpen((open) => !open)}
+          >
+            Run failed again
+          </Button>
+        ) : null}
         {isAdmin ? (
           <Button
             variant="danger"
@@ -173,6 +230,19 @@ export function ReviewPage() {
           </Button>
         ) : null}
       </Stack>
+
+      {rerunOpen && batch.counts.failed > 0 ? (
+        <RerunFailed
+          failed={batch.counts.failed}
+          currentModel={batch.model}
+          busy={review.busy}
+          onRun={(model) => {
+            void review.rerun(model).then((ok) => {
+              if (ok) setRerunOpen(false)
+            })
+          }}
+        />
+      ) : null}
 
       <Card>
         <form onSubmit={(event) => void onAdd(event)}>
