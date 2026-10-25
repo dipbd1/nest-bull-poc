@@ -162,7 +162,7 @@ describe('BatchService', () => {
       {
         title: ' Q3 survey ',
         tags: ['Bug', 'Praise'],
-        comments: `${SECRET_COMMENT}\n\nLove it`,
+        comments: [SECRET_COMMENT, 'Love it'],
         model: 'vendor/free-model:free',
       },
       actor,
@@ -214,7 +214,7 @@ describe('BatchService', () => {
 
     await expect(
       service.create(
-        { title: 't', tags: ['a', 'b'], comments: 'one', model: 'text/high' },
+        { title: 't', tags: ['a', 'b'], comments: ['one'], model: 'text/high' },
         actor,
       ),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
@@ -229,7 +229,7 @@ describe('BatchService', () => {
 
     await expect(
       service.create(
-        { title: 't', tags: ['a', 'b'], comments: 'one', model: 'other' },
+        { title: 't', tags: ['a', 'b'], comments: ['one'], model: 'other' },
         actor,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);

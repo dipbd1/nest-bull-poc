@@ -17,6 +17,7 @@ export {
   deleteBatchItem,
   exportBatchCsv,
   getBatch,
+  getModelDescription,
   listBatchModels,
   listBatches,
   setFinalTag,

@@ -12,6 +12,7 @@ import {
   MAX_TAG_LENGTH,
   MAX_TAGS,
   MAX_TITLE_LENGTH,
+  MIN_COMMENTS,
   MIN_TAGS,
 } from '../batch.limits.js';
 
@@ -28,10 +29,13 @@ export class CreateBatchDto {
   @MaxLength(MAX_TAG_LENGTH, { each: true })
   tags: string[];
 
-  /** Pasted text, one comment per line. */
-  @IsString()
-  @MaxLength(MAX_COMMENTS * (MAX_COMMENT_LENGTH + 2))
-  comments: string;
+  /** One string per comment. Line breaks stay inside that comment. */
+  @IsArray()
+  @ArrayMinSize(MIN_COMMENTS)
+  @ArrayMaxSize(MAX_COMMENTS)
+  @IsString({ each: true })
+  @MaxLength(MAX_COMMENT_LENGTH, { each: true })
+  comments: string[];
 
   @IsString()
   @IsNotEmpty()

@@ -29,6 +29,7 @@ import { csvFilename, itemsToCsv } from './batch.csv.js';
 import {
   BatchInputError,
   MAX_COMMENTS,
+  parseCommentEntries,
   parseComments,
   parseTags,
 } from './batch.limits.js';
@@ -139,6 +140,10 @@ export class BatchService {
     private readonly audit: AuditService,
   ) {}
 
+  modelDescription(modelId: string): Promise<{ description: string }> {
+    return this.catalog.fullDescription(modelId).then((description) => ({ description }));
+  }
+
   async models(): Promise<BatchModels> {
     const openrouter = this.openRouter();
     const models = rankFreeModels(await this.catalog.listFreeModels());
@@ -154,7 +159,7 @@ export class BatchService {
     let comments: string[];
     try {
       tags = parseTags(dto.tags);
-      comments = parseComments(dto.comments);
+      comments = parseCommentEntries(dto.comments);
     } catch (error) {
       if (error instanceof BatchInputError) {
         throw new BadRequestException(error.message);

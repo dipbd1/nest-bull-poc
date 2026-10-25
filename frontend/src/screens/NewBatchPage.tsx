@@ -1,12 +1,14 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import {
+  MAX_COMMENT_LENGTH,
   MAX_COMMENTS,
   MAX_TAG_LENGTH,
   MAX_TAGS,
   MAX_TITLE_LENGTH,
   MIN_TAGS,
   checkNewBatch,
+  commentEntries,
 } from '../domain/batches.ts'
 import { chosenModelId, readsAndWritesText } from '../domain/models.ts'
 import { useBatchModels, useCreateBatch } from '../features/index.ts'
@@ -17,11 +19,23 @@ import {
   Heading,
   Stack,
   Text,
-  TextArea,
   TextField,
   TextLink,
 } from '../ui/index.ts'
 import { ModelField } from './ModelField.tsx'
+import styles from './NewBatchPage.module.css'
+
+type CommentBox = {
+  id: number
+  text: string
+}
+
+function isTextField(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable) return true
+  const tag = target.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+}
 
 export function NewBatchPage() {
   const navigate = useNavigate()
@@ -30,23 +44,69 @@ export function NewBatchPage() {
 
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState<string[]>([])
-  const [comments, setComments] = useState('')
+  const [boxes, setBoxes] = useState<CommentBox[]>([{ id: 1, text: '' }])
   const [pickedModel, setPickedModel] = useState('')
+  const nextId = useRef(2)
+  const countRef = useRef(boxes.length)
+  const pendingFocus = useRef<number | null>(null)
 
   const model = chosenModelId(catalog.models, pickedModel, catalog.defaultModel)
   const selected = catalog.models.find((item) => item.id === model)
   const modelBlocked =
     !catalog.ready || !selected || !readsAndWritesText(selected)
 
+  const comments = boxes.map((box) => box.text)
   const input = { title, tags, comments, model }
   const check = checkNewBatch(input)
   const overCap = check.commentCount > MAX_COMMENTS
   const noModels = catalog.loaded && catalog.models.length === 0
+  const started =
+    title.length > 0 || tags.length > 0 || boxes.some((box) => box.text.trim() !== '')
+
+  const appendBox = useCallback((text: string) => {
+    if (countRef.current >= MAX_COMMENTS) return
+    const id = nextId.current
+    nextId.current += 1
+    countRef.current += 1
+    pendingFocus.current = id
+    setBoxes((current) => [...current, { id, text }])
+  }, [])
+
+  function removeBox(id: number) {
+    setBoxes((current) => {
+      if (current.length === 1) return [{ ...current[0], text: '' }]
+      return current.filter((box) => box.id !== id)
+    })
+  }
+
+  useEffect(() => {
+    countRef.current = boxes.length
+    const id = pendingFocus.current
+    if (id === null) return
+    pendingFocus.current = null
+    document.getElementById(`comment-${id}`)?.focus()
+  }, [boxes])
+
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      if (isTextField(event.target)) return
+      const text = event.clipboardData?.getData('text')?.trim() ?? ''
+      if (!text) return
+      event.preventDefault()
+      appendBox(text)
+    }
+
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [appendBox])
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (check.problem) return
-    const id = await creator.create(input)
+    const id = await creator.create({
+      ...input,
+      comments: commentEntries(comments),
+    })
     if (id) navigate(`/batches/${id}`)
   }
 
@@ -83,15 +143,63 @@ export function NewBatchPage() {
               placeholder="Type a tag, press Enter"
             />
 
-            <TextArea
-              label="Comments, one per line"
-              name="comments"
-              rows={10}
-              placeholder={'The delivery arrived two days late.\nPlease add a dark mode.'}
-              value={comments}
-              onChange={(event) => setComments(event.target.value)}
-              required
-            />
+            <fieldset className={styles.comments}>
+              <legend className={styles.legend}>Inputs</legend>
+              {boxes.map((box, index) => {
+                const tooLong = box.text.trim().length > MAX_COMMENT_LENGTH
+                const number = index + 1
+                return (
+                  <div key={box.id} className={styles.comment}>
+                    <div className={styles.field}>
+                      <span className={styles.index} aria-hidden="true">
+                        {number}
+                      </span>
+                      <textarea
+                        id={`comment-${box.id}`}
+                        className={styles.control}
+                        name={`comment-${box.id}`}
+                        rows={3}
+                        aria-label={`Input ${number}`}
+                        placeholder={
+                          index === 0
+                            ? 'The delivery arrived two days late.'
+                            : undefined
+                        }
+                        value={box.text}
+                        onChange={(event) =>
+                          setBoxes((current) =>
+                            current.map((item) =>
+                              item.id === box.id
+                                ? { ...item, text: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                    <Button variant="secondary" onClick={() => removeBox(box.id)}>
+                      Remove
+                    </Button>
+                    {tooLong ? (
+                      <Text className={styles.note} tone="error">
+                        Longer than {MAX_COMMENT_LENGTH} characters.
+                      </Text>
+                    ) : null}
+                  </div>
+                )
+              })}
+              <Button
+                variant="secondary"
+                disabled={boxes.length >= MAX_COMMENTS}
+                onClick={() => appendBox('')}
+              >
+                Add comment
+              </Button>
+              <Text tone="hint">
+                Each box is one comment. Ctrl+V pastes the clipboard into a new
+                comment.
+              </Text>
+            </fieldset>
             <Text tone={overCap ? 'error' : 'hint'} aria-live="polite">
               {check.commentCount} of {MAX_COMMENTS} comments
               {overCap ? ` — remove ${check.commentCount - MAX_COMMENTS}` : ''}
@@ -116,7 +224,7 @@ export function NewBatchPage() {
             {catalog.error ? <Text tone="error">{catalog.error}</Text> : null}
 
             {creator.error ? <Text tone="error">{creator.error}</Text> : null}
-            {check.problem && (title || tags.length > 0 || comments) ? (
+            {check.problem && started ? (
               <Text tone="hint">{check.problem}</Text>
             ) : null}
 

@@ -17,6 +17,21 @@ export function listBatchModels() {
   return request<BatchModels>('/batches/models')
 }
 
+const fullDescriptions = new Map<string, string>()
+
+/** The catalog blurb is often cut. This is the full text from the model page. */
+export function getModelDescription(modelId: string) {
+  const cached = fullDescriptions.get(modelId)
+  if (cached !== undefined) return Promise.resolve({ description: cached })
+  const query = new URLSearchParams({ model: modelId })
+  return request<{ description: string }>(
+    `/batches/models/description?${query}`,
+  ).then((result) => {
+    fullDescriptions.set(modelId, result.description)
+    return result
+  })
+}
+
 export function getBatch(id: string) {
   return request<BatchDetail>(`/batches/${id}`)
 }

@@ -52,3 +52,27 @@ export function parseComments(raw: string): string[] {
   }
   return lines;
 }
+
+/** One array entry per comment. Blanks are dropped. Line breaks stay inside an entry. */
+export function parseCommentEntries(raw: string[]): string[] {
+  const comments = raw
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+  if (comments.length < MIN_COMMENTS) {
+    throw new BatchInputError('Add at least one comment');
+  }
+  if (comments.length > MAX_COMMENTS) {
+    throw new BatchInputError(
+      `A batch can hold at most ${MAX_COMMENTS} comments`,
+    );
+  }
+  const tooLong = comments.findIndex(
+    (entry) => entry.length > MAX_COMMENT_LENGTH,
+  );
+  if (tooLong !== -1) {
+    throw new BatchInputError(
+      `Comment ${tooLong + 1} is longer than ${MAX_COMMENT_LENGTH} characters`,
+    );
+  }
+  return comments;
+}

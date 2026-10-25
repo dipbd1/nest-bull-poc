@@ -105,8 +105,9 @@ Every route below is relative to the API root. Through the proxy the browser use
 | `GET /auth/oidc/start`, `GET /auth/oidc/callback` | Anyone | Company login redirects. Browser navigations, not fetch calls. |
 | `GET /auth/me` | Signed in | `{ id, email, emailVerifiedAt, role }`. |
 | `POST /users/invites/accept` | Anyone with a token | `{ token, password }`. Link is `/invite?token=...`. |
-| `GET /batches/models` | Signed in | Free OpenRouter models, the suggested default, and whether the key is set. |
-| `POST /batches` | Signed in | `{ title, tags, comments, model }`. 2-8 unique tags, 1-100 comment lines, model on the free list. Queues one job per comment. |
+| `GET /batches/models` | Signed in | Free OpenRouter models, the suggested default, and whether the key is set. List descriptions may end in `...`. |
+| `GET /batches/models/description` | Signed in | `?model=` a free-model id. `{ description }` is the full blurb from that model's page. |
+| `POST /batches` | Signed in | `{ title, tags, comments, model }`. 2-8 unique tags, 1-100 comment strings (line breaks stay in the comment), model on the free list. Queues one job per comment. |
 | `GET /batches`, `GET /batches/:id` | Signed in | Company-wide batches with progress counts, and one batch with its items. |
 | `POST /batches/:id/comments` | Signed in | `{ comments }`, one per line. Appends rows up to 100 total and queues each one on the batch's model. |
 | `PATCH /batches/:id/items/:itemId` | Signed in | `{ finalTag }`, one of the batch tags. A blank value clears the tag. |

@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -44,6 +45,11 @@ export class BatchController {
   @Get('models')
   models() {
     return this.batches.models();
+  }
+
+  @Get('models/description')
+  modelDescription(@Query('model') model: string) {
+    return this.batches.modelDescription(model ?? '');
   }
 
   @Get(':id')

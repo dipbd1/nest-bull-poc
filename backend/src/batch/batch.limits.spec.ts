@@ -2,6 +2,7 @@ import {
   BatchInputError,
   MAX_COMMENT_LENGTH,
   MAX_COMMENTS,
+  parseCommentEntries,
   parseComments,
   parseTags,
 } from './batch.limits.js';
@@ -40,6 +41,25 @@ describe('parseComments', () => {
     const long = 'x'.repeat(MAX_COMMENT_LENGTH + 1);
     expect(() => parseComments(`ok\n${long}`)).toThrow('Comment 2');
     expect(parseComments('x'.repeat(MAX_COMMENT_LENGTH))).toHaveLength(1);
+  });
+});
+
+describe('parseCommentEntries', () => {
+  it('drops blanks and keeps a newline inside one comment', () => {
+    expect(parseCommentEntries(['  first\nsecond  ', ' ', '\n', 'third'])).toEqual([
+      'first\nsecond',
+      'third',
+    ]);
+  });
+
+  it('rejects an empty list, one entry over the cap, and a long comment', () => {
+    expect(() => parseCommentEntries([' ', ''])).toThrow('Add at least one comment');
+    expect(() =>
+      parseCommentEntries(Array.from({ length: MAX_COMMENTS + 1 }, () => 'ok')),
+    ).toThrow(BatchInputError);
+    expect(() => parseCommentEntries(['ok', 'x'.repeat(MAX_COMMENT_LENGTH + 1)])).toThrow(
+      'Comment 2',
+    );
   });
 });
 

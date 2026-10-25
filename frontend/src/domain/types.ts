@@ -90,7 +90,8 @@ export type BatchModels = {
 export type NewBatchInput = {
   title: string
   tags: string[]
-  comments: string
+  /** One string per comment. Line breaks stay inside that comment. */
+  comments: string[]
   model: string
 }
 

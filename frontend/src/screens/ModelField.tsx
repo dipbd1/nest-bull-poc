@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { getModelDescription } from '../api/batches.ts'
 import {
+  formatTokens,
   matchesModelQuery,
   modelFactLine,
   readsAndWritesText,
   scoreText,
-  formatTokens,
 } from '../domain/models.ts'
 import type { CodingModel } from '../domain/types.ts'
 import { cx, Text, TextField } from '../ui/index.ts'
@@ -19,8 +20,17 @@ type ModelFieldProps = {
 
 export function ModelField({ models, value, loaded, onChange }: ModelFieldProps) {
   const [filter, setFilter] = useState('')
-  const selected = models.find((model) => model.id === value) ?? null
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
   const shown = models.filter((model) => matchesModelQuery(model, filter))
+
+  function toggle(id: string) {
+    setOpen((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   return (
     <fieldset className={styles.field}>
@@ -31,8 +41,7 @@ export function ModelField({ models, value, loaded, onChange }: ModelFieldProps)
         Coding and agent scores matter less here. JSON output is what the coder
         needs.
       </Text>
-      {selected ? <SelectedModel model={selected} /> : null}
-      {!selected && !loaded ? <Text tone="muted">Loading…</Text> : null}
+      {!loaded ? <Text tone="muted">Loading…</Text> : null}
       <TextField
         label="Filter models"
         name="modelFilter"
@@ -42,36 +51,17 @@ export function ModelField({ models, value, loaded, onChange }: ModelFieldProps)
         onChange={(event) => setFilter(event.target.value)}
       />
       <div className={styles.list} role="radiogroup" aria-label="Free OpenRouter models">
-        {shown.map((model) => {
-          const usable = readsAndWritesText(model)
-          const picked = model.id === value
-          return (
-            <label
-              key={model.id}
-              className={cx(styles.option, picked && styles.picked, !usable && styles.blocked)}
-            >
-              <input
-                type="radio"
-                name="model"
-                value={model.id}
-                checked={picked}
-                disabled={!usable}
-                onChange={() => onChange(model.id)}
-              />
-              <span className={styles.copy}>
-                <span className={styles.name}>{model.name}</span>
-                <span className={styles.id}>{model.id}</span>
-                <span className={styles.facts}>{modelFactLine(model)}</span>
-                {model.description ? (
-                  <span className={styles.description}>{model.description}</span>
-                ) : null}
-                {usable ? null : (
-                  <span className={styles.facts}>Does not read and write text.</span>
-                )}
-              </span>
-            </label>
-          )
-        })}
+        {shown.map((model, index) => (
+          <ModelOption
+            key={model.id}
+            model={model}
+            index={index}
+            picked={model.id === value}
+            expanded={open.has(model.id)}
+            onChange={onChange}
+            onToggle={() => toggle(model.id)}
+          />
+        ))}
         {loaded && models.length > 0 && shown.length === 0 ? (
           <Text tone="muted">No model matches.</Text>
         ) : null}
@@ -81,27 +71,94 @@ export function ModelField({ models, value, loaded, onChange }: ModelFieldProps)
   )
 }
 
-function SelectedModel({ model }: { model: CodingModel }) {
-  const reads = model.inputModalities.length > 0 ? model.inputModalities.join(', ') : 'not listed'
+function descriptionIsCut(text: string): boolean {
+  return text.endsWith('...') || text.endsWith('…')
+}
+
+function ModelOption({
+  model,
+  index,
+  picked,
+  expanded,
+  onChange,
+  onToggle,
+}: {
+  model: CodingModel
+  index: number
+  picked: boolean
+  expanded: boolean
+  onChange: (id: string) => void
+  onToggle: () => void
+}) {
+  const usable = readsAndWritesText(model)
+  const detailsId = `model-details-${index}`
+  const reads =
+    model.inputModalities.length > 0 ? model.inputModalities.join(', ') : 'not listed'
+  const cut = descriptionIsCut(model.description)
+  const [full, setFull] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  function onDetailsClick() {
+    if (!expanded && cut && !full && !loading) {
+      setLoading(true)
+      getModelDescription(model.id)
+        .then((result) => setFull(result.description))
+        .catch(() => setFull(null))
+        .finally(() => setLoading(false))
+    }
+    onToggle()
+  }
+
   return (
-    <div className={styles.detail}>
-      <Text tone="strong">{model.name}</Text>
-      <p className={styles.id}>{model.id}</p>
-      {model.description ? <Text>{model.description}</Text> : null}
-      <Text tone="hint">
-        {`Context ${formatTokens(model.contextLength)}. Max output ${formatTokens(model.maxOutputTokens)}. Reads ${reads}.`}
-      </Text>
-      <Text tone="hint">
-        {`Intelligence ${scoreText(model.intelligenceIndex)}. Coding ${scoreText(model.codingIndex)}. Agent ${scoreText(model.agenticIndex)}.`}
-      </Text>
-      <Text tone="hint">
-        {model.supportsStructuredOutput
-          ? 'Returns JSON.'
-          : 'JSON output not listed, so tags may come back for review.'}
-      </Text>
-      {readsAndWritesText(model) ? null : (
-        <Text tone="error">Does not read and write text.</Text>
-      )}
+    <div className={cx(styles.option, picked && styles.picked, !usable && styles.blocked)}>
+      <label className={styles.choice}>
+        <input
+          type="radio"
+          name="model"
+          value={model.id}
+          checked={picked}
+          disabled={!usable}
+          onChange={() => onChange(model.id)}
+        />
+        <span className={styles.copy}>
+          <span className={styles.name}>{model.name}</span>
+          <span className={styles.id}>{model.id}</span>
+          <span className={styles.facts}>{modelFactLine(model)}</span>
+          {usable ? null : (
+            <span className={styles.facts}>Does not read and write text.</span>
+          )}
+        </span>
+      </label>
+      <button
+        type="button"
+        className={styles.details}
+        aria-expanded={expanded}
+        aria-controls={detailsId}
+        onClick={onDetailsClick}
+      >
+        {expanded ? 'Hide details' : 'Details'}
+      </button>
+      {expanded ? (
+        <div id={detailsId} className={styles.more}>
+          {full || model.description ? (
+            <p className={styles.description}>{full ?? model.description}</p>
+          ) : null}
+          {loading && !full ? (
+            <Text tone="hint">Loading the rest of the description…</Text>
+          ) : null}
+          <Text tone="hint">
+            {`Context ${formatTokens(model.contextLength)}. Max output ${formatTokens(model.maxOutputTokens)}. Reads ${reads}.`}
+          </Text>
+          <Text tone="hint">
+            {`Intelligence ${scoreText(model.intelligenceIndex)}. Coding ${scoreText(model.codingIndex)}. Agent ${scoreText(model.agenticIndex)}.`}
+          </Text>
+          <Text tone="hint">
+            {model.supportsStructuredOutput
+              ? 'Returns JSON.'
+              : 'JSON output not listed, so tags may come back for review.'}
+          </Text>
+        </div>
+      ) : null}
     </div>
   )
 }

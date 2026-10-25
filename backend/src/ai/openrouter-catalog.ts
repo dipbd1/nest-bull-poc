@@ -27,11 +27,58 @@ function isFreePrice(value: unknown): boolean {
   return typeof value === 'string' && value.trim() !== '' && Number(value) === 0;
 }
 
-function readText(value: unknown, max: number): string {
+/** Safety cap so one catalog listing cannot carry an unbounded blurb. */
+const DESCRIPTION_CAP = 4000;
+
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+
+export function isOpenRouterModelId(value: string): boolean {
+  return MODEL_ID.test(value);
+}
+
+/**
+ * The models list cuts blurbs with "...". The model page's JSON-LD keeps the
+ * rest. Prefer the longest description that is not one of those cuts.
+ */
+export function readModelPageDescription(html: string): string | null {
+  const found: string[] = [];
+  for (const match of html.matchAll(
+    /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi,
+  )) {
+    try {
+      collectDescriptions(JSON.parse(match[1]), found);
+    } catch {
+      continue;
+    }
+  }
+  const complete = found
+    .map((text) => text.trim())
+    .filter((text) => text !== '' && !text.endsWith('...') && !text.endsWith('…'));
+  if (complete.length === 0) return null;
+  const longest = complete.reduce((best, text) =>
+    text.length > best.length ? text : best,
+  );
+  return longest.length <= DESCRIPTION_CAP
+    ? longest
+    : longest.slice(0, DESCRIPTION_CAP);
+}
+
+function collectDescriptions(value: unknown, found: string[]): void {
+  if (Array.isArray(value)) {
+    for (const item of value) collectDescriptions(item, found);
+    return;
+  }
+  if (!isRecord(value)) return;
+  if (typeof value.description === 'string') found.push(value.description);
+  for (const child of Object.values(value)) collectDescriptions(child, found);
+}
+
+function readDescription(value: unknown): string {
   if (typeof value !== 'string') return '';
   const compact = value.replace(/\s+/g, ' ').trim();
-  if (compact.length <= max) return compact;
-  return `${compact.slice(0, max - 1).trimEnd()}…`;
+  return compact.length <= DESCRIPTION_CAP
+    ? compact
+    : compact.slice(0, DESCRIPTION_CAP);
 }
 
 function readNumber(value: unknown): number | null {
@@ -135,7 +182,7 @@ export function freeOpenRouterModels(payload: unknown): OpenRouterModelChoice[] 
     models.push({
       id,
       name: name || id,
-      description: readText(item.description, 320),
+      description: readDescription(item.description),
       contextLength: readNumber(item.context_length),
       maxOutputTokens: provider
         ? readNumber(provider.max_completion_tokens)

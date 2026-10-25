@@ -23,6 +23,11 @@ export function parseCommentLines(text: string): string[] {
     .filter((line) => line !== '')
 }
 
+/** One entry per comment box. Blanks are dropped. Line breaks stay inside an entry. */
+export function commentEntries(texts: string[]): string[] {
+  return texts.map((text) => text.trim()).filter((text) => text !== '')
+}
+
 export type NewBatchCheck = {
   commentCount: number
   /** First reason the batch cannot be created yet, or null when it can. */
@@ -30,7 +35,7 @@ export type NewBatchCheck = {
 }
 
 export function checkNewBatch(input: NewBatchInput): NewBatchCheck {
-  const lines = parseCommentLines(input.comments)
+  const lines = commentEntries(input.comments)
   const commentCount = lines.length
   const title = input.title.trim()
 
@@ -39,7 +44,7 @@ export function checkNewBatch(input: NewBatchInput): NewBatchCheck {
     return { commentCount, problem: `Add at least ${MIN_TAGS} tags.` }
   }
   if (commentCount === 0) {
-    return { commentCount, problem: 'Paste at least one comment.' }
+    return { commentCount, problem: 'Add at least one comment.' }
   }
   if (commentCount > MAX_COMMENTS) {
     return {
@@ -47,7 +52,9 @@ export function checkNewBatch(input: NewBatchInput): NewBatchCheck {
       problem: `A batch holds at most ${MAX_COMMENTS} comments. Remove ${commentCount - MAX_COMMENTS}.`,
     }
   }
-  const tooLong = lines.findIndex((line) => line.length > MAX_COMMENT_LENGTH)
+  const tooLong = input.comments.findIndex(
+    (text) => text.trim().length > MAX_COMMENT_LENGTH,
+  )
   if (tooLong !== -1) {
     return {
       commentCount,

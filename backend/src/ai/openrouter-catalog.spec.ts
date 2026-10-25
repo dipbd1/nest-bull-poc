@@ -4,6 +4,7 @@ import type { AiConfig } from '../config/ai.config.js';
 import {
   freeOpenRouterModels,
   rankFreeModels,
+  readModelPageDescription,
   suggestedFreeModel,
   type OpenRouterModelChoice,
 } from './openrouter-catalog.js';
@@ -72,6 +73,35 @@ describe('freeOpenRouterModels', () => {
     });
   });
 
+  it('keeps a description up to 4000 characters and collapses whitespace', () => {
+    const within = freeOpenRouterModels({
+      data: [
+        {
+          id: 'vendor/long:free',
+          name: 'Long',
+          description: `  line one \n\n ${'x'.repeat(3990)}  `,
+          pricing: { prompt: '0', completion: '0' },
+        },
+      ],
+    });
+    expect(within[0].description.startsWith('line one ')).toBe(true);
+    expect(within[0].description).not.toContain('\n');
+    expect(within[0].description.endsWith('…')).toBe(false);
+    expect(within[0].description.length).toBeLessThanOrEqual(4000);
+
+    const capped = freeOpenRouterModels({
+      data: [
+        {
+          id: 'vendor/huge:free',
+          name: 'Huge',
+          description: 'y'.repeat(4500),
+          pricing: { prompt: '0', completion: '0' },
+        },
+      ],
+    });
+    expect(capped[0].description).toBe('y'.repeat(4000));
+  });
+
   it('ranks text models that return JSON ahead of the rest', () => {
     const models = rankFreeModels([
       choice({
@@ -125,6 +155,20 @@ describe('freeOpenRouterModels', () => {
   });
 });
 
+describe('readModelPageDescription', () => {
+  it('keeps the longest complete blurb and drops the cut list copy', () => {
+    const html = [
+      '<script type="application/ld+json">{"description":"Short list copy..."}</script>',
+      '<script type="application/ld+json">{"description":"First paragraph.\\n\\nSecond paragraph."}</script>',
+    ].join('');
+
+    expect(readModelPageDescription(html)).toBe(
+      'First paragraph.\n\nSecond paragraph.',
+    );
+    expect(readModelPageDescription('<p>No json ld</p>')).toBeNull();
+  });
+});
+
 describe('OpenRouterCatalogService', () => {
   it('loads the free list once and rejects a model that is not on it', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
@@ -168,6 +212,58 @@ describe('OpenRouterCatalogService', () => {
     await expect(
       catalog.assertFreeModel('vendor/free-model:free'),
     ).resolves.toBeUndefined();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('loads the full page blurb once for a free model', async () => {
+    const html =
+      '<script type="application/ld+json">{"description":"The complete blurb."}</script>';
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              id: 'vendor/free-model:free',
+              name: 'Free model',
+              description: 'The complete...',
+              pricing: { prompt: '0', completion: '0' },
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => html,
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        OpenRouterCatalogService,
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: () => config },
+        },
+      ],
+    }).compile();
+    const catalog = moduleRef.get(OpenRouterCatalogService);
+
+    await expect(catalog.fullDescription('vendor/free-model:free')).resolves.toBe(
+      'The complete blurb.',
+    );
+    await expect(catalog.fullDescription('vendor/free-model:free')).resolves.toBe(
+      'The complete blurb.',
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      'https://openrouter.ai/vendor/free-model:free',
+      expect.objectContaining({ headers: { accept: 'text/html' } }),
+    );
+    await expect(catalog.fullDescription('not a model')).rejects.toThrow(
+      'Choose a free OpenRouter model',
+    );
 
     vi.unstubAllGlobals();
   });

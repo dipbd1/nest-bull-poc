@@ -13,15 +13,6 @@
   color: var(--color-text-strong);
 }
 
-.detail {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-}
-
 .list {
   display: grid;
   gap: var(--space-2);
@@ -35,11 +26,19 @@
 
 .option {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
   align-items: start;
   padding: var(--space-2);
   border-radius: var(--radius-xs);
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  min-width: 0;
   cursor: pointer;
 }
 
@@ -48,8 +47,35 @@
   outline: 1px solid var(--color-accent);
 }
 
-.blocked {
+.blocked .choice {
   cursor: not-allowed;
+}
+
+.details {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.details:hover {
+  text-decoration: underline;
+}
+
+.more {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.description {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: var(--leading-body);
 }
 
 .copy {
@@ -71,16 +97,8 @@
   overflow-wrap: anywhere;
 }
 
-.facts,
-.description {
+.facts {
   color: var(--color-muted);
   font-size: var(--text-xs);
   line-height: var(--leading-body);
-}
-
-.description {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }

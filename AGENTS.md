@@ -90,8 +90,9 @@ Global `ValidationPipe`: `whitelist`, `forbidNonWhitelisted`, `transform`. Extra
 | `GET /auth/oidc/start`, `GET /auth/oidc/callback` | No | Company login. Full-page redirects that end at `${WEB_ORIGIN}/` or `${WEB_ORIGIN}/login?error=<code>`. |
 | `GET /auth/me` | Session | `{ id, email, emailVerifiedAt, role }`. |
 | `POST /users/invites/accept` | No | `{ token, password }`. Link is `/invite?token=...`. |
-| `GET /batches/models` | Session | `{ models, defaultModel, ready }`. `models` is the live free OpenRouter catalog (name, description, context, scores, JSON support). `POST /batches` accepts only those ids. `ready` is false when `OPENROUTER_API_KEY` is empty. |
-| `POST /batches` | Session | `{ title, tags, comments, model }`. Tags 2-8 unique, up to 40 chars. Comments 1-100 non-empty lines, up to 2,000 chars. One BullMQ job `{ itemId }` per comment. |
+| `GET /batches/models` | Session | `{ models, defaultModel, ready }`. `models` is the live free OpenRouter catalog (name, description, context, scores, JSON support). A list description may end in `...`. `POST /batches` accepts only those ids. `ready` is false when `OPENROUTER_API_KEY` is empty. |
+| `GET /batches/models/description` | Session | `?model=` a free-model id. `{ description }` is the full blurb from that model's page. |
+| `POST /batches` | Session | `{ title, tags, comments, model }`. Tags 2-8 unique, up to 40 chars. `comments` is 1-100 strings, each up to 2,000 chars; line breaks stay inside that comment. One BullMQ job `{ itemId }` per comment. |
 | `GET /batches`, `GET /batches/:id` | Session | Company-wide. Not scoped to the caller. |
 | `POST /batches/:id/comments` | Session | `{ comments }`, one per line. Appends rows up to 100 total and queues each one on the batch's model. Audited as `batch.add_comments` with a count, never comment text. |
 | `PATCH /batches/:id/items/:itemId` | Session | `{ finalTag }`, one of the batch tags. A blank value clears the tag. Audited. |
