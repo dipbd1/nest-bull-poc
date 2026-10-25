@@ -34,6 +34,7 @@ describe('ProducerService', () => {
     add: vi.fn(),
     getJobs: vi.fn(),
     getJob: vi.fn(),
+    getJobCounts: vi.fn(),
   };
   const catalog = {
     listFreeModels: vi.fn(),
@@ -44,6 +45,7 @@ describe('ProducerService', () => {
     jobQueue.add.mockReset().mockResolvedValue(undefined);
     jobQueue.getJobs.mockReset();
     jobQueue.getJob.mockReset();
+    jobQueue.getJobCounts.mockReset();
     catalog.listFreeModels.mockReset();
     catalog.assertFreeModel.mockReset().mockResolvedValue(undefined);
 
@@ -97,24 +99,56 @@ describe('ProducerService', () => {
     expect(jobQueue.add).not.toHaveBeenCalled();
   });
 
-  it('maps listed jobs to a plain view', async () => {
+  it('pages jobs for one state newest first', async () => {
     jobQueue.getJobs.mockResolvedValue([makeJob()]);
-    await expect(service.findAll()).resolves.toEqual([
-      {
-        id: '1',
-        name: 'jobs',
-        data: {
-          name: 'alpha',
-          description: 'first job',
-          model: 'vendor/free-model:free',
-          userId: 'user-1',
+    jobQueue.getJobCounts.mockResolvedValue({ waiting: 1 });
+    await expect(
+      service.findAll({ state: 'waiting', offset: 0, limit: 20 }),
+    ).resolves.toEqual({
+      items: [
+        {
+          id: '1',
+          name: 'jobs',
+          data: {
+            name: 'alpha',
+            description: 'first job',
+            model: 'vendor/free-model:free',
+            userId: 'user-1',
+          },
+          state: 'waiting',
+          attemptsMade: 0,
+          timestamp: 123,
+          failedReason: null,
         },
-        state: 'waiting',
-        attemptsMade: 0,
-        timestamp: 123,
-        failedReason: null,
-      },
-    ]);
+      ],
+      total: 1,
+      offset: 0,
+      limit: 20,
+    });
+    expect(jobQueue.getJobs).toHaveBeenCalledWith(['waiting'], 0, 19, false);
+    expect(jobQueue.getJobCounts).toHaveBeenCalledWith('waiting');
+  });
+
+  it('defaults offset and limit when paging jobs', async () => {
+    jobQueue.getJobs.mockResolvedValue([]);
+    jobQueue.getJobCounts.mockResolvedValue({ completed: 0 });
+    await expect(service.findAll({ state: 'completed' })).resolves.toEqual({
+      items: [],
+      total: 0,
+      offset: 0,
+      limit: 20,
+    });
+    expect(jobQueue.getJobs).toHaveBeenCalledWith(['completed'], 0, 19, false);
+  });
+
+  it('pages the paused list', async () => {
+    jobQueue.getJobs.mockResolvedValue([]);
+    jobQueue.getJobCounts.mockResolvedValue({ paused: 0 });
+    await expect(
+      service.findAll({ state: 'paused', offset: 20, limit: 20 }),
+    ).resolves.toMatchObject({ total: 0, offset: 20, limit: 20 });
+    expect(jobQueue.getJobs).toHaveBeenCalledWith(['paused'], 20, 39, false);
+    expect(jobQueue.getJobCounts).toHaveBeenCalledWith('paused');
   });
 
   it('returns null when a job is missing', async () => {

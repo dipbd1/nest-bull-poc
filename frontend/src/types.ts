@@ -26,6 +26,24 @@ export type ProducerJob = {
   failedReason: string | null
 }
 
+export const JOB_STATES = [
+  'waiting',
+  'active',
+  'completed',
+  'failed',
+  'delayed',
+  'paused',
+] as const
+
+export type JobState = (typeof JOB_STATES)[number]
+
+export type ProducerJobPage = {
+  items: ProducerJob[]
+  total: number
+  offset: number
+  limit: number
+}
+
 export type QueueStatus = {
   name: string
   waiting: number
@@ -43,6 +61,7 @@ export type ConsumerStatus = {
 
 export type LayoutContext = {
   refreshStatus: () => Promise<void>
+  status: QueueStatus | null
 }
 
 export type AuthUser = {

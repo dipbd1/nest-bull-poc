@@ -20,6 +20,7 @@ describe('ProducerController', () => {
             add: vi.fn(),
             getJobs: vi.fn(),
             getJob: vi.fn(),
+            getJobCounts: vi.fn(),
           },
         },
         {

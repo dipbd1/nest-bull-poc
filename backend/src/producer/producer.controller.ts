@@ -6,12 +6,14 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { JwtPayload } from '../auth/auth.types.js';
 import { CreateProducerDto } from './dto/create-producer.dto.js';
+import { ListJobsQueryDto } from './dto/list-jobs-query.dto.js';
 import { UpdateProducerDto } from './dto/update-producer.dto.js';
 import { ProducerService } from './producer.service.js';
 
@@ -29,8 +31,8 @@ export class ProducerController {
   }
 
   @Get()
-  findAll() {
-    return this.producerService.findAll();
+  findAll(@Query() query: ListJobsQueryDto) {
+    return this.producerService.findAll(query);
   }
 
   @Get('models')

@@ -78,7 +78,7 @@ Global `ValidationPipe`: `whitelist`, `forbidNonWhitelisted`, `transform`. Extra
 | `GET /auth/me` | Bearer | Profile for the token `sub`. |
 | `GET /producer/models` | Bearer | Free OpenRouter models. Cached 5 minutes. Public catalog fetch, no API key on that GET. |
 | `POST /producer` | Bearer | `{ name, description, model }`. Model must be in the free catalog. Enqueues job name `jobs` with `{ name, description, model, userId }`. |
-| `GET /producer` | Bearer | Every job in the queue, not scoped to the caller. |
+| `GET /producer` | Bearer | One page of jobs for a required `state` (`waiting`, `active`, `completed`, `failed`, `delayed`, `paused`). Query: `offset` default 0, `limit` default 20 max 50. Returns `{ items, total, offset, limit }`. Not scoped to the caller. |
 | `GET /producer/:id` | Bearer | One job, or `null`. |
 | `PATCH /producer/:id` | Bearer | Update name, description, and/or model. |
 | `DELETE /producer/:id` and `DELETE /producer` | Bearer | Remove one job, or all jobs. |

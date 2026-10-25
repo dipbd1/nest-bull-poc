@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Job, Queue } from 'bullmq';
+import { Job, Queue, type JobType } from 'bullmq';
 import { OpenRouterCatalogService } from '../ai/openrouter-catalog.service.js';
 import { CreateProducerDto } from './dto/create-producer.dto.js';
+import type { ListJobsQuery } from './dto/list-jobs-query.dto.js';
 import { UpdateProducerDto } from './dto/update-producer.dto.js';
 import { jobQueueName } from '../config/queue.config.js';
 
@@ -21,6 +22,13 @@ export type ProducerJobView = {
   attemptsMade: number;
   timestamp: number;
   failedReason: string | null;
+};
+
+export type ProducerJobPage = {
+  items: ProducerJobView[];
+  total: number;
+  offset: number;
+  limit: number;
 };
 
 @Injectable()
@@ -49,9 +57,22 @@ export class ProducerService {
     return data;
   }
 
-  async findAll() {
-    const jobs = await this.jobQueue.getJobs();
-    return Promise.all(jobs.map((job) => this.toJobView(job)));
+  async findAll(query: ListJobsQuery): Promise<ProducerJobPage> {
+    const offset = query.offset ?? 0;
+    const limit = query.limit ?? 20;
+    const { state } = query;
+    const jobType = state as JobType;
+    const [jobs, counts] = await Promise.all([
+      this.jobQueue.getJobs([jobType], offset, offset + limit - 1, false),
+      this.jobQueue.getJobCounts(jobType),
+    ]);
+    const items = await Promise.all(jobs.map((job) => this.toJobView(job)));
+    return {
+      items,
+      total: counts[state] ?? 0,
+      offset,
+      limit,
+    };
   }
 
   async findOne(id: number) {

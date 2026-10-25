@@ -273,6 +273,29 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.job-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.job-tabs button {
+  background: transparent;
+  color: var(--text-h);
+  border: 1px solid transparent;
+}
+
+.job-tabs button[aria-selected='true'] {
+  background: var(--card);
+  border-color: var(--border);
+}
+
+.job-tab-count {
+  margin-left: 8px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
 .job-list {
   display: grid;
   gap: 12px;

@@ -49,7 +49,7 @@ export function App() {
       </header>
       <QueueStatusBar status={status} error={error} />
       <main>
-        <Outlet context={{ refreshStatus } satisfies LayoutContext} />
+        <Outlet context={{ refreshStatus, status } satisfies LayoutContext} />
       </main>
     </div>
   )

@@ -6,7 +6,9 @@ import type {
   ConversationDetail,
   ConversationSummary,
   FreeModel,
+  JobState,
   ProducerJob,
+  ProducerJobPage,
   ProducerPayload,
   QueueStatus,
   RegisterResponse,
@@ -129,8 +131,17 @@ export function getQueueStatus() {
   return request<QueueStatus>('/queue/status', { auth: false })
 }
 
-export function listJobs() {
-  return request<ProducerJob[]>('/producer')
+export function listJobs(params: {
+  state: JobState
+  offset?: number
+  limit?: number
+}) {
+  const search = new URLSearchParams({
+    state: params.state,
+    offset: String(params.offset ?? 0),
+    limit: String(params.limit ?? 20),
+  })
+  return request<ProducerJobPage>(`/producer?${search}`)
 }
 
 export function listFreeModels() {
