@@ -1,0 +1,25 @@
+.person {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: var(--space-2) 0;
+}
+
+.email {
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+@media (max-width: 640px) {
+  .person,
+  .form {
+    grid-template-columns: 1fr;
+  }
+}

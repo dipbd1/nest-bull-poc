@@ -15,6 +15,8 @@ export class MailService {
       host: this.auth.smtp.host,
       port: this.auth.smtp.port,
       secure: false,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
     });
   }
 
@@ -31,5 +33,23 @@ export class MailService {
         'Failed to send registration email',
       );
     }
+  }
+
+  async sendInvite(email: string, link: string, expiresAt: Date): Promise<void> {
+    try {
+      await this.transporter.sendMail({
+        from: this.auth.mailFrom,
+        to: email,
+        subject: 'You are invited to the feedback coder',
+        text: `Open this link to set your password: ${link}\n\nThe link expires at ${expiresAt.toISOString()}.`,
+      });
+    } catch {
+      throw new ServiceUnavailableException('Failed to send invitation email');
+    }
+  }
+
+  /** Opens an SMTP connection and greets the server. Sends nothing. */
+  verify(): Promise<true> {
+    return this.transporter.verify();
   }
 }

@@ -4,5 +4,110 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/features/**", "src/session/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/ui", "**/ui/**", "**/screens", "**/screens/**"],
+                "message": "features/ and session/ must not import ui/ or screens/."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/domain/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/ui",
+                  "**/ui/**",
+                  "**/screens",
+                  "**/screens/**",
+                  "**/api",
+                  "**/api/**",
+                  "**/features",
+                  "**/features/**",
+                  "**/session",
+                  "**/session/**"
+                ],
+                "message": "domain/ holds pure types and helpers. It imports nothing from the other layers."
+              },
+              {
+                "group": ["react", "react-dom", "react-router"],
+                "message": "domain/ must not import React."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/api/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/ui",
+                  "**/ui/**",
+                  "**/screens",
+                  "**/screens/**",
+                  "**/features",
+                  "**/features/**",
+                  "**/session",
+                  "**/session/**"
+                ],
+                "message": "api/ may import domain/ only."
+              },
+              {
+                "group": ["react", "react-dom", "react-router"],
+                "message": "api/ must not import React."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/ui/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/api",
+                  "**/api/**",
+                  "**/features",
+                  "**/features/**",
+                  "**/domain",
+                  "**/domain/**",
+                  "**/screens",
+                  "**/screens/**",
+                  "**/session",
+                  "**/session/**"
+                ],
+                "message": "ui/ is presentational. It must not import api/, features/, domain/, screens/, or session/."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

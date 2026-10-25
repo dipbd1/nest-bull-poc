@@ -1,0 +1,35 @@
+.comment {
+  margin: 0;
+  color: var(--color-text-strong);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bubble {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: 10px var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.bubbleUser {
+  background: var(--color-bg);
+}
+
+.bubbleAssistant {
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
+
+.role {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+.plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

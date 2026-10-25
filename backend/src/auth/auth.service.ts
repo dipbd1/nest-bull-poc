@@ -5,12 +5,14 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { AppConfig } from '../config/app.config.js';
 import type { AuthConfig } from '../config/auth.config.js';
 import {
   generateRegistrationCode,
@@ -31,12 +33,15 @@ import { VerifyRegistrationDto } from './dto/verify-registration.dto.js';
 import { RegistrationCode } from './entities/registration-code.entity.js';
 import { User } from './entities/user.entity.js';
 import { MailService } from './mail.service.js';
+import { readOidcSettings } from './oidc/oidc.client.js';
 
 const INVALID_CODE_MESSAGE = 'Invalid or expired verification code';
 const INVALID_CREDENTIALS_MESSAGE = 'Invalid email or password';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly users: Repository<User>,
@@ -50,10 +55,36 @@ export class AuthService {
   getPublicConfig(): AuthPublicConfig {
     return {
       emailVerificationRequired: this.authConfig().emailVerificationRequired,
+      publicRegistration: this.appConfig().allowPublicRegister,
+      companyLogin:
+        readOidcSettings(
+          (key) => this.config.get<string>(key),
+          this.appConfig().webOrigin,
+        ) !== null,
     };
   }
 
+  /** Creates the first admin from env when no user exists yet. */
+  async bootstrapAdmin(): Promise<void> {
+    const bootstrap = this.appConfig().bootstrapAdmin;
+    if (!bootstrap) return;
+    if ((await this.users.count()) > 0) return;
+
+    await this.users.save(
+      this.users.create({
+        email: normalizeEmail(bootstrap.email),
+        passwordHash: await hashPassword(bootstrap.password),
+        emailVerifiedAt: new Date(),
+        role: 'admin',
+      }),
+    );
+    this.logger.log('Created the bootstrap admin from BOOTSTRAP_ADMIN_EMAIL');
+  }
+
   async register(dto: RegisterDto): Promise<RegisterResult> {
+    if (!this.appConfig().allowPublicRegister) {
+      throw new ForbiddenException('Registration is closed');
+    }
     const auth = this.authConfig();
     const email = normalizeEmail(dto.email);
     const existing = await this.users.findOne({ where: { email } });
@@ -138,7 +169,7 @@ export class AuthService {
     user.emailVerifiedAt = new Date();
     await this.users.save(user);
     await this.codes.delete({ userId: user.id });
-    return { accessToken: await this.signToken(user) };
+    return { accessToken: await this.issueToken(user) };
   }
 
   async login(dto: LoginDto): Promise<{ accessToken: string }> {
@@ -152,12 +183,16 @@ export class AuthService {
       throw new ForbiddenException('Email is not verified');
     }
 
-    return { accessToken: await this.signToken(user) };
+    if (user.disabledAt) {
+      throw new ForbiddenException('Account is disabled');
+    }
+
+    return { accessToken: await this.issueToken(user) };
   }
 
   async getProfile(userId: string): Promise<AuthUser> {
     const user = await this.users.findOne({ where: { id: userId } });
-    if (!user) {
+    if (!user || user.disabledAt) {
       throw new UnauthorizedException();
     }
 
@@ -165,7 +200,22 @@ export class AuthService {
       id: user.id,
       email: user.email,
       emailVerifiedAt: user.emailVerifiedAt,
+      role: user.role,
     };
+  }
+
+  /** Expiry of a token this service issued, for the cookie `Expires`. */
+  tokenExpiry(token: string): Date | undefined {
+    const decoded = this.jwt.decode<{ exp?: number } | null>(token);
+    return decoded?.exp ? new Date(decoded.exp * 1000) : undefined;
+  }
+
+  issueToken(user: User): Promise<string> {
+    return this.jwt.signAsync({
+      sub: user.id,
+      email: user.email,
+      sv: user.sessionVersion,
+    });
   }
 
   private async registerWithoutVerification(
@@ -192,7 +242,7 @@ export class AuthService {
     return {
       email,
       verificationRequired: false,
-      accessToken: await this.signToken(user),
+      accessToken: await this.issueToken(user),
     };
   }
 
@@ -200,14 +250,14 @@ export class AuthService {
     return this.config.getOrThrow<AuthConfig>('auth');
   }
 
+  private appConfig(): AppConfig {
+    return this.config.getOrThrow<AppConfig>('app');
+  }
+
   private latestCode(userId: string): Promise<RegistrationCode | null> {
     return this.codes.findOne({
       where: { userId },
       order: { createdAt: 'DESC' },
     });
-  }
-
-  private signToken(user: User): Promise<string> {
-    return this.jwt.signAsync({ sub: user.id, email: user.email });
   }
 }

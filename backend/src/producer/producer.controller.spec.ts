@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { OpenRouterCatalogService } from '../ai/openrouter-catalog.service.js';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { jobQueueName } from '../config/queue.config.js';
 import { ProducerController } from './producer.controller.js';
@@ -17,15 +16,10 @@ describe('ProducerController', () => {
         {
           provide: getQueueToken(jobQueueName),
           useValue: {
-            add: vi.fn(),
             getJobs: vi.fn(),
             getJob: vi.fn(),
             getJobCounts: vi.fn(),
           },
-        },
-        {
-          provide: OpenRouterCatalogService,
-          useValue: { listFreeModels: vi.fn(), assertFreeModel: vi.fn() },
         },
       ],
     })
@@ -38,5 +32,15 @@ describe('ProducerController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('has no create or edit route', () => {
+    const proto = ProducerController.prototype as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(proto.create).toBeUndefined();
+    expect(proto.update).toBeUndefined();
+    expect(proto.listModels).toBeUndefined();
   });
 });

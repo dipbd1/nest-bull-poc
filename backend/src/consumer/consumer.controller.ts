@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { AdminGuard } from '../auth/admin.guard.js';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { ConsumerService } from './consumer.service.js';
 import { UpdateConsumerDto } from './dto/update-consumer.dto.js';
@@ -14,6 +15,7 @@ export class ConsumerController {
   }
 
   @Patch()
+  @UseGuards(AdminGuard)
   setStatus(@Body() dto: UpdateConsumerDto) {
     return this.consumerService.setRunning(dto.running);
   }

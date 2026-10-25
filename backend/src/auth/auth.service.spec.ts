@@ -10,6 +10,7 @@ import {
   HttpStatus,
   UnauthorizedException,
 } from '@nestjs/common';
+import type { AppConfig } from '../config/app.config.js';
 import type { AuthConfig } from '../config/auth.config.js';
 import { AuthService } from './auth.service.js';
 import {
@@ -32,12 +33,22 @@ const authConfig: AuthConfig = {
   emailVerificationRequired: true,
 };
 
+const appConfig: AppConfig = {
+  isProduction: false,
+  webOrigin: 'http://localhost:5173',
+  allowPublicRegister: true,
+  bootstrapAdmin: null,
+};
+
 function makeUser(overrides: Partial<User> = {}): User {
   return {
     id: 'user-1',
     email: 'ada@example.com',
     passwordHash: 'salt:hash',
     emailVerifiedAt: null,
+    role: 'reviewer',
+    disabledAt: null,
+    sessionVersion: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
     registrationCodes: [],
@@ -64,6 +75,7 @@ describe('AuthService', () => {
     findOne: ReturnType<typeof vi.fn>;
     save: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
+    count: ReturnType<typeof vi.fn>;
   };
   let codes: {
     findOne: ReturnType<typeof vi.fn>;
@@ -74,15 +86,22 @@ describe('AuthService', () => {
   let mail: { sendRegistrationCode: ReturnType<typeof vi.fn> };
   let jwt: { signAsync: ReturnType<typeof vi.fn> };
 
+  let oidcEnv: Record<string, string | undefined>;
+
   beforeEach(async () => {
+    oidcEnv = {};
     authConfig.emailVerificationRequired = true;
+    appConfig.allowPublicRegister = true;
+    appConfig.bootstrapAdmin = null;
     users = {
       findOne: vi.fn(),
       save: vi.fn(async (user: User) => {
         user.id ??= 'user-1';
+        user.sessionVersion ??= 1;
         return user;
       }),
       create: vi.fn((user: Partial<User>) => user),
+      count: vi.fn().mockResolvedValue(0),
     };
     codes = {
       findOne: vi.fn(),
@@ -103,8 +122,10 @@ describe('AuthService', () => {
         {
           provide: ConfigService,
           useValue: {
+            get: vi.fn((key: string) => oidcEnv[key]),
             getOrThrow: vi.fn((key: string) => {
               if (key === 'auth') return authConfig;
+              if (key === 'app') return appConfig;
               throw new Error(`unexpected config key ${key}`);
             }),
           },
@@ -113,6 +134,21 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get(AuthService);
+  });
+
+  it('offers company login only when all three OIDC variables are set', () => {
+    expect(service.getPublicConfig().companyLogin).toBe(false);
+
+    oidcEnv.OIDC_ISSUER = 'https://idp.example.com';
+    oidcEnv.OIDC_CLIENT_ID = 'client';
+    expect(service.getPublicConfig().companyLogin).toBe(false);
+
+    oidcEnv.OIDC_CLIENT_SECRET = 'secret';
+    expect(service.getPublicConfig()).toMatchObject({
+      companyLogin: true,
+      publicRegistration: true,
+      emailVerificationRequired: true,
+    });
   });
 
   it('registers an unverified user and emails a code', async () => {
@@ -191,6 +227,7 @@ describe('AuthService', () => {
     expect(jwt.signAsync).toHaveBeenCalledWith({
       sub: user.id,
       email: user.email,
+      sv: 1,
     });
   });
 
@@ -276,7 +313,54 @@ describe('AuthService', () => {
     expect(jwt.signAsync).toHaveBeenCalledWith({
       sub: 'user-1',
       email: 'ada@example.com',
+      sv: 1,
     });
+  });
+
+  it('refuses registration unless public registration is allowed', async () => {
+    appConfig.allowPublicRegister = false;
+
+    await expect(
+      service.register({ email: 'ada@example.com', password: 'password1' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(users.save).not.toHaveBeenCalled();
+  });
+
+  it('rejects login for a disabled user', async () => {
+    const passwordHash = await hashPassword('password1');
+    users.findOne.mockResolvedValue(
+      makeUser({
+        passwordHash,
+        emailVerifiedAt: new Date(),
+        disabledAt: new Date(),
+      }),
+    );
+
+    await expect(
+      service.login({ email: 'ada@example.com', password: 'password1' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(jwt.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('creates the bootstrap admin only when the user table is empty', async () => {
+    appConfig.bootstrapAdmin = {
+      email: 'Admin@Example.com',
+      password: 'bootstrap-password',
+    };
+
+    await service.bootstrapAdmin();
+    expect(users.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'admin@example.com',
+        role: 'admin',
+        emailVerifiedAt: expect.any(Date),
+      }),
+    );
+
+    users.save.mockClear();
+    users.count.mockResolvedValue(1);
+    await service.bootstrapAdmin();
+    expect(users.save).not.toHaveBeenCalled();
   });
 
   it('rejects registration when verification is off and the email is already verified', async () => {

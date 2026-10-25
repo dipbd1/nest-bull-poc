@@ -4,27 +4,25 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
-import type { Job } from 'bullmq';
 import { AiModule } from '../src/ai/ai.module.js';
+import { AiService } from '../src/ai/ai.service.js';
 import { RegistrationCode } from '../src/auth/entities/registration-code.entity.js';
 import { User } from '../src/auth/entities/user.entity.js';
+import { FeedbackBatch } from '../src/batch/entities/feedback-batch.entity.js';
+import { FeedbackItem } from '../src/batch/entities/feedback-item.entity.js';
 import { aiConfig } from '../src/config/ai.config.js';
 import {
   databaseConfig,
   type DatabaseConfig,
 } from '../src/config/database.config.js';
-import {
-  ConsumerProcessor,
-  JOB_SYSTEM_PROMPT,
-  jobUserPrompt,
-} from '../src/consumer/consumer.processor.js';
 import { ConversationService } from '../src/conversation/conversation.service.js';
 import { ConversationMessage } from '../src/conversation/entities/conversation-message.entity.js';
 import { Conversation } from '../src/conversation/entities/conversation.entity.js';
-import type { ProducerJobData } from '../src/producer/producer.service.js';
 
 const apiKey = process.env.OPENROUTER_API_KEY?.trim() ?? '';
 const hasLiveKey = apiKey.length > 0;
+
+const SYSTEM_PROMPT = 'You answer in one short sentence.';
 
 function redact(error: unknown): Error {
   const parts: string[] = [];
@@ -56,14 +54,13 @@ function redact(error: unknown): Error {
   return new Error(safe);
 }
 
-describe.skipIf(!hasLiveKey)('OpenRouter job chat (live)', () => {
+describe.skipIf(!hasLiveKey)('OpenRouter conversation (live)', () => {
   let moduleRef: TestingModule;
-  let processor: ConsumerProcessor;
+  let ai: AiService;
   let conversations: ConversationService;
   const userId = randomUUID();
   const jobId = `live-${randomUUID()}`;
-  const jobName = 'Live ping';
-  const jobDescription = 'Reply with one short sentence that includes the word pong.';
+  const userPrompt = 'Reply with one short sentence that includes the word pong.';
   let conversationId: string | undefined;
 
   beforeAll(async () => {
@@ -82,7 +79,14 @@ describe.skipIf(!hasLiveKey)('OpenRouter job chat (live)', () => {
               type: 'postgres' as const,
               url: database.url,
               ssl: true,
-              entities: [User, RegistrationCode, Conversation, ConversationMessage],
+              entities: [
+                User,
+                RegistrationCode,
+                Conversation,
+                ConversationMessage,
+                FeedbackBatch,
+                FeedbackItem,
+              ],
               synchronize: true,
               uuidExtension: 'pgcrypto' as const,
               extra: {
@@ -92,13 +96,17 @@ describe.skipIf(!hasLiveKey)('OpenRouter job chat (live)', () => {
             };
           },
         }),
-        TypeOrmModule.forFeature([Conversation, ConversationMessage]),
+        TypeOrmModule.forFeature([
+          Conversation,
+          ConversationMessage,
+          FeedbackItem,
+        ]),
         AiModule,
       ],
-      providers: [ConversationService, ConsumerProcessor],
+      providers: [ConversationService],
     }).compile();
 
-    processor = moduleRef.get(ConsumerProcessor);
+    ai = moduleRef.get(AiService);
     conversations = moduleRef.get(ConversationService);
   }, 30_000);
 
@@ -117,75 +125,66 @@ describe.skipIf(!hasLiveKey)('OpenRouter job chat (live)', () => {
   });
 
   it(
-    'processes a job through OpenRouter and continues the stored chat',
+    'stores a model reply and continues the chat',
     async () => {
-      const job = {
-        id: jobId,
-        data: {
-          name: jobName,
-          description: jobDescription,
-          model: 'vendor/free-model:free',
-          userId,
-        },
-      } as Job<ProducerJobData>;
-
-      let first: { conversationId: string; text: string };
+      let generated: Awaited<ReturnType<AiService['generateText']>>;
       try {
-        first = await processor.process(job);
+        generated = await ai.generateText({
+          provider: 'openrouter',
+          model: 'vendor/free-model:free',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+        });
       } catch (error) {
         throw redact(error);
       }
-      conversationId = first.conversationId;
 
-      expect(first.conversationId).toEqual(expect.any(String));
-      expect(first.text.trim().length).toBeGreaterThan(0);
-      expect(first.text).not.toContain(apiKey);
+      const created = await conversations.createInitial({
+        jobId,
+        userId,
+        title: 'Live ping',
+        provider: generated.provider,
+        model: 'vendor/free-model:free',
+        systemContent: SYSTEM_PROMPT,
+        userContent: userPrompt,
+        assistantContent: generated.text,
+      });
+      conversationId = created.id;
 
-      const stored = await conversations.getForUser(first.conversationId, userId);
+      expect(generated.text.trim().length).toBeGreaterThan(0);
+      expect(generated.text).not.toContain(apiKey);
+
+      const stored = await conversations.getForUser(created.id, userId);
       expect(stored).toMatchObject({
-        title: jobName,
+        title: 'Live ping',
         provider: 'openrouter',
         jobId,
         model: expect.any(String),
       });
-      expect(stored.model.trim().length).toBeGreaterThan(0);
       expect(stored.messages.map((message) => message.role)).toEqual([
         'system',
         'user',
         'assistant',
       ]);
-      expect(stored.messages[0]?.content).toBe(JOB_SYSTEM_PROMPT);
-      expect(stored.messages[1]?.content).toBe(
-        jobUserPrompt(jobName, jobDescription),
-      );
-      expect(stored.messages[2]?.content).toBe(first.text);
+      expect(stored.messages[2]?.content).toBe(generated.text);
 
       const listed = await conversations.listForUser(userId);
       expect(listed).toEqual([
         expect.objectContaining({
-          id: first.conversationId,
-          preview: first.text,
+          id: created.id,
+          preview: generated.text,
         }),
       ]);
       await expect(
-        conversations.getForUser(first.conversationId, randomUUID()),
+        conversations.getForUser(created.id, randomUUID()),
       ).rejects.toBeInstanceOf(NotFoundException);
-
-      const replay = await processor.process(job);
-      expect(replay).toEqual({
-        conversationId: first.conversationId,
-        text: first.text,
-      });
-      const stillOne = await conversations.getForUser(
-        first.conversationId,
-        userId,
-      );
-      expect(stillOne.messages).toHaveLength(3);
 
       let continued: Awaited<ReturnType<ConversationService['addUserMessage']>>;
       try {
         continued = await conversations.addUserMessage(
-          first.conversationId,
+          created.id,
           userId,
           'Reply with the single word continued.',
         );

@@ -1,6 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import process from 'node:process';
 import { assertAiEnv } from './ai.config.js';
+import { assertProductionEnv } from './app.config.js';
 import { assertAuthEnv } from './auth.config.js';
 import { assertDatabaseEnv } from './database.config.js';
 
@@ -13,9 +14,21 @@ try {
 const DEFAULT_QUEUE_NAME = 'jobs';
 const DEFAULT_REDIS_HOST = 'localhost';
 const DEFAULT_REDIS_PORT = 6379;
+const DEFAULT_MODEL_REQUESTS_PER_MINUTE = 20;
 
 export const jobQueueName =
   process.env.JOB_QUEUE_NAME?.trim() || DEFAULT_QUEUE_NAME;
+
+export function readModelRequestsPerMinute(value: string | undefined): number {
+  const parsed = Number.parseInt(value?.trim() ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_MODEL_REQUESTS_PER_MINUTE;
+}
+
+export const modelRequestsPerMinute = readModelRequestsPerMinute(
+  process.env.MODEL_REQUESTS_PER_MINUTE,
+);
 
 function readOptionalString(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
@@ -40,6 +53,7 @@ export function validateEnv(config: Record<string, unknown>) {
   assertAiEnv(config);
   assertDatabaseEnv(config);
   assertAuthEnv(config);
+  assertProductionEnv(config);
   return config;
 }
 

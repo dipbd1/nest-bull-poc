@@ -1,35 +1,17 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
-import { App } from './App.tsx'
-import { AuthProvider, RedirectIfAuthed, RequireAuth } from './auth.tsx'
-import { AuthPage } from './pages/AuthPage.tsx'
-import { ConsumersPage } from './pages/ConsumersPage.tsx'
-import { ProducerPage } from './pages/ProducerPage.tsx'
-import './index.css'
+import { BrowserRouter } from 'react-router'
+import { AppRoutes } from './routes.tsx'
+import { SessionProvider } from './session/index.ts'
+import './ui/tokens.css'
+import './ui/base.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
+    <SessionProvider>
       <BrowserRouter>
-        <Routes>
-          <Route
-            path="/login"
-            element={
-              <RedirectIfAuthed>
-                <AuthPage />
-              </RedirectIfAuthed>
-            }
-          />
-          <Route element={<RequireAuth />}>
-            <Route element={<App />}>
-              <Route path="/" element={<ProducerPage />} />
-              <Route path="/consumers" element={<ConsumersPage />} />
-            </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AppRoutes />
       </BrowserRouter>
-    </AuthProvider>
+    </SessionProvider>
   </StrictMode>,
 )

@@ -1,0 +1,61 @@
+.badge {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.success {
+  background: color-mix(in srgb, var(--color-completed) 18%, transparent);
+  color: var(--color-completed);
+}
+
+.accent {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+}
+
+.info {
+  background: color-mix(in srgb, var(--color-active) 18%, transparent);
+  color: var(--color-active);
+}
+
+.warning {
+  background: color-mix(in srgb, var(--color-waiting) 20%, transparent);
+  color: var(--color-waiting);
+}
+
+.neutral {
+  background: color-mix(in srgb, var(--color-muted) 16%, transparent);
+  color: var(--color-text);
+}
+
+.status {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.status.waiting {
+  color: var(--color-waiting);
+}
+
+.status.active {
+  color: var(--color-active);
+}
+
+.status.completed {
+  color: var(--color-completed);
+}
+
+.status.failed {
+  color: var(--color-failed);
+}
+
+.danger {
+  background: color-mix(in srgb, var(--color-failed) 16%, transparent);
+  color: var(--color-failed);
+}

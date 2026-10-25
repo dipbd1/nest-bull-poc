@@ -24,17 +24,19 @@ npm run start:dev
 
 ## Required services
 
-- `DATABASE_URL` in `backend/.env` (or repo-root `.env.local`). Postgres must accept TLS. Schema is updated on boot (`synchronize: true`).
+- `DATABASE_URL` in `backend/.env` (or repo-root `.env.local`). Postgres must accept TLS. Development synchronizes the schema on boot; production (`NODE_ENV=production`) runs the committed migrations instead.
 - Redis at `REDIS_HOST`:`REDIS_PORT` (default `localhost:6379`) before boot.
-- `OPENROUTER_API_KEY` before a queued job or a follow-up message can succeed.
-- SMTP at `localhost:1025` while `EMAIL_VERIFICATION_REQUIRED` is true. Set it to `false` to skip email codes.
+- `OPENROUTER_API_KEY` before a queued comment can succeed. Ask uses the provider stored on the conversation.
+- SMTP at `localhost:1025` (default) to send invitations.
 
-`backend/.env` overrides the same keys in repo-root `.env.local`.
+`backend/.env` overrides the same keys in repo-root `.env.local`. A variable already in the process environment beats both.
 
 ## Modules
 
-`src/main.ts` enables CORS for `http://localhost:5173` and a global validation pipe that rejects unknown body fields.
+`src/main.ts` rejects any request whose `Origin` is not `WEB_ORIGIN`, enables credentialed CORS for that origin, and installs a global validation pipe that rejects unknown body fields. Production refuses to start until `WEB_ORIGIN`, a non-default `JWT_SECRET`, `DATABASE_URL`, `REDIS_HOST`, and the provider key are set.
 
-`src/app.module.ts` loads config, then `DatabaseModule`, `AiModule`, `AuthModule`, `ConversationModule`, `QueueModule`, `ProducerModule`, and `ConsumerModule`.
+`src/app.module.ts` loads config, then `DatabaseModule`, `AiModule`, `AuditModule`, `AuthModule` (roles, session cookie, optional company login), `UsersModule`, `SettingsModule`, `ConversationModule`, `QueueModule`, `BatchModule`, `ConnectionsModule`, `RetentionModule`, `ProducerModule` (read-only queue inspection), and `ConsumerModule`.
 
-Relative imports use a `.js` extension. Register any new TypeORM entity on the `entities` array in `src/database/database.module.ts`.
+Relative imports use a `.js` extension. Register any new TypeORM entity in `ENTITIES` and any new migration in `MIGRATIONS` in `src/database/database.module.ts`.
+
+The HTTP surface is listed in [../README.md](../README.md). The operator SOP is [../docs/operations.md](../docs/operations.md).

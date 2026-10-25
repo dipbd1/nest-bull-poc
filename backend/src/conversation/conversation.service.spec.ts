@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AiService } from '../ai/ai.service.js';
+import { FeedbackItem } from '../batch/entities/feedback-item.entity.js';
 import { ConversationService } from './conversation.service.js';
 import { ConversationMessage } from './entities/conversation-message.entity.js';
 import { Conversation } from './entities/conversation.entity.js';
@@ -72,8 +73,10 @@ describe('ConversationService', () => {
     save: vi.fn(),
   };
   const ai = { generateText: vi.fn() };
+  const items = { exists: vi.fn() };
 
   beforeEach(async () => {
+    items.exists.mockReset().mockResolvedValue(false);
     conversations.find.mockReset();
     conversations.findOne.mockReset();
     conversations.create.mockReset();
@@ -91,6 +94,7 @@ describe('ConversationService', () => {
           provide: getRepositoryToken(ConversationMessage),
           useValue: messages,
         },
+        { provide: getRepositoryToken(FeedbackItem), useValue: items },
         { provide: AiService, useValue: ai },
       ],
     }).compile();
@@ -115,6 +119,21 @@ describe('ConversationService', () => {
     await expect(service.getForUser('conv-1', 'user-2')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('lets any user open a conversation linked to a feedback item', async () => {
+    const conversation = makeConversation();
+    conversations.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(conversation);
+    items.exists.mockResolvedValue(true);
+
+    await expect(service.getForUser('conv-1', 'user-2')).resolves.toEqual(
+      expect.objectContaining({ id: 'conv-1' }),
+    );
+    expect(items.exists).toHaveBeenCalledWith({
+      where: { conversationId: 'conv-1' },
+    });
   });
 
   it('replays history and saves both new messages after a follow-up', async () => {

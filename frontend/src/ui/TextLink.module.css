@@ -1,0 +1,9 @@
+.link {
+  width: fit-content;
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+}
+
+.link:hover {
+  text-decoration: underline;
+}

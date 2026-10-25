@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AiService } from '../ai/ai.service.js';
 import type { AiMessage, AiProviderName } from '../ai/ai.types.js';
+import { FeedbackItem } from '../batch/entities/feedback-item.entity.js';
 import { ConversationMessage } from './entities/conversation-message.entity.js';
 import { Conversation } from './entities/conversation.entity.js';
 import type {
@@ -72,6 +73,8 @@ export class ConversationService {
     private readonly conversations: Repository<Conversation>,
     @InjectRepository(ConversationMessage)
     private readonly messages: Repository<ConversationMessage>,
+    @InjectRepository(FeedbackItem)
+    private readonly items: Repository<FeedbackItem>,
     private readonly ai: AiService,
   ) {}
 
@@ -170,14 +173,27 @@ export class ConversationService {
     return toDetail(conversation);
   }
 
+  /**
+   * Batch conversations are company-wide: any active user may open the one
+   * linked to a feedback item. Other conversations stay with their owner.
+   */
   private async requireForUser(
     id: string,
     userId: string,
   ): Promise<Conversation> {
-    const conversation = await this.conversations.findOne({
+    let conversation = await this.conversations.findOne({
       where: { id, userId },
       relations: { messages: true },
     });
+    if (
+      !conversation &&
+      (await this.items.exists({ where: { conversationId: id } }))
+    ) {
+      conversation = await this.conversations.findOne({
+        where: { id },
+        relations: { messages: true },
+      });
+    }
     if (!conversation) {
       throw new NotFoundException('Conversation not found');
     }

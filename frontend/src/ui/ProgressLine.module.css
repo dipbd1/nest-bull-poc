@@ -1,0 +1,12 @@
+.track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+}
+
+.fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 200ms ease;
+}

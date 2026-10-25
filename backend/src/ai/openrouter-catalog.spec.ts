@@ -1,7 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import type { AiConfig } from '../config/ai.config.js';
-import { freeOpenRouterModels } from './openrouter-catalog.js';
+import {
+  freeOpenRouterModels,
+  rankFreeModels,
+  suggestedFreeModel,
+  type OpenRouterModelChoice,
+} from './openrouter-catalog.js';
 import { OpenRouterCatalogService } from './openrouter-catalog.service.js';
 
 const config = {
@@ -24,7 +29,11 @@ describe('freeOpenRouterModels', () => {
           name: 'Free model',
           description: 'A small instruct model.',
           context_length: 8192,
-          architecture: { input_modalities: ['text'] },
+          architecture: {
+            input_modalities: ['text'],
+            output_modalities: ['text'],
+          },
+          supported_parameters: ['response_format', 'temperature'],
           top_provider: { max_completion_tokens: 2048 },
           benchmarks: {
             artificial_analysis: {
@@ -55,10 +64,58 @@ describe('freeOpenRouterModels', () => {
       contextLength: 8192,
       maxOutputTokens: 2048,
       inputModalities: ['text'],
+      outputModalities: ['text'],
+      supportsStructuredOutput: true,
       intelligenceIndex: 18.5,
       codingIndex: null,
       agenticIndex: 4,
     });
+  });
+
+  it('ranks text models that return JSON ahead of the rest', () => {
+    const models = rankFreeModels([
+      choice({
+        id: 'audio/out',
+        name: 'Audio',
+        outputModalities: ['audio'],
+        supportsStructuredOutput: true,
+        intelligenceIndex: 99,
+      }),
+      choice({
+        id: 'text/plain',
+        name: 'Plain',
+        supportsStructuredOutput: false,
+        intelligenceIndex: 40,
+      }),
+      choice({
+        id: 'text/low',
+        name: 'Low',
+        intelligenceIndex: 10,
+      }),
+      choice({
+        id: 'text/high',
+        name: 'High',
+        intelligenceIndex: 22,
+      }),
+    ]);
+
+    expect(models.map((model) => model.id)).toEqual([
+      'text/high',
+      'text/low',
+      'text/plain',
+      'audio/out',
+    ]);
+  });
+
+  it('prefers the configured model when it is free', () => {
+    const models = [
+      choice({ id: 'text/high', name: 'High', intelligenceIndex: 30 }),
+      choice({ id: 'text/pinned', name: 'Pinned', intelligenceIndex: 1 }),
+    ];
+
+    expect(suggestedFreeModel(models, 'text/pinned')).toBe('text/pinned');
+    expect(suggestedFreeModel(models, 'openai/gpt-4o-mini')).toBe('text/high');
+    expect(suggestedFreeModel([], 'openai/gpt-4o-mini')).toBe('');
   });
 
   it('rejects an unrecognized catalog payload', () => {
@@ -115,3 +172,20 @@ describe('OpenRouterCatalogService', () => {
     vi.unstubAllGlobals();
   });
 });
+
+function choice(
+  overrides: Partial<OpenRouterModelChoice> & Pick<OpenRouterModelChoice, 'id' | 'name'>,
+): OpenRouterModelChoice {
+  return {
+    description: '',
+    contextLength: 8192,
+    maxOutputTokens: 2048,
+    inputModalities: ['text'],
+    outputModalities: ['text'],
+    supportsStructuredOutput: true,
+    intelligenceIndex: null,
+    codingIndex: null,
+    agenticIndex: null,
+    ...overrides,
+  };
+}
