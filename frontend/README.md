@@ -1,32 +1,35 @@
-# React + TypeScript + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Vite + React 19 console for the queue API. The API runbook is [../README.md](../README.md). Agent constraints are in [../AGENTS.md](../AGENTS.md).
 
-Currently, two official plugins are available:
+## Commands
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Run these in `frontend/`.
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+| Script | What it does |
+| --- | --- |
+| `npm run dev` | Vite on `http://localhost:5173`. |
+| `npm run build` | `tsc -b`, then `vite build`. |
+| `npm run preview` | Serve the production build. |
+| `npm run lint` | oxlint. |
+
+There is no test script. The API must already be on `http://localhost:3000`. CORS on the API allows only port 5173, so leave the Vite port unchanged unless `backend/src/main.ts` changes with it.
+
+## Env
+
+`VITE_API_BASE_URL` defaults to `http://localhost:3000` in `src/api.ts`. Copy `.env.example` to `.env` to override it, then restart `npm run dev`. Only `VITE_` variables are visible in client code.
+
+## Routes
+
+| Path | Page | API |
+| --- | --- | --- |
+| `/login` | Register, verify, and log in | `/auth/*` |
+| `/` | Create and edit jobs. Requires a signed-in user. | `/producer`, `/producer/models` |
+| `/consumers` | Pause the worker and continue a conversation | `/consumer`, `/conversations` |
+
+The shell polls `GET /queue/status` every 3 seconds. The access token lives in `localStorage` under `accessToken` and is attached by `src/api.ts`.
